@@ -21,6 +21,7 @@ const resetBtn   = document.getElementById("resetBtn");
 const sheets     = Array.from(document.querySelectorAll(".sheet"));   // 3 reusable layers
 const shards     = Array.from(document.querySelectorAll(".shard"));   // 3 reusable scraps
 const handEl     = document.getElementById("hand");                     // v3 cut-out hand overlay
+const controlsEl = document.querySelector(".controls");
 const zoomEl     = document.getElementById("zoom");                     // winner lightbox
 const zoomImg    = document.getElementById("zoomImg");
 const zoomCap    = document.getElementById("zoomCap");
@@ -190,12 +191,13 @@ function burst(count) {
 
 // ── v5: the LOWER hand (chest height, reaching to the board; pivot = wrist) ──
 // The upper hand holding the board stays in the background. This one swings around the wrist,
-// with the same d / offsets as tearSheet: pinch → lift (−8°, final −10°) → swing down hard
-// (+14°, final +17.5°) as the paper rips → spring back (−3°).
+// with the same d / offsets as tearSheet: pinch → lift (−16°, final −20°) → yank down hard
+// (+28°, final +35°) while the hand also drops ≈ 15% of its width → spring back (−5°).
 // Fingers point right, wrist on the left: rotate > 0 = fingers down, < 0 = fingers up.
-// Translation stays within ~3% of the hand so it never separates from the cuff in the background.
+// translate % is relative to the hand box (181×78): 15% of its width ≈ 35% of its height.
 const H = (x, y, r) => `translate(${x}, ${y}) rotate(${r}deg)`;
-const HAND_TENSE = { y: -3, r: -6 };              // pre-final pause: lifted, holding the paper taut
+const HAND_TENSE = { y: -6, r: -12 };             // pre-final pause: lifted, holding the paper taut
+const HAND_DROP = 35;                             // % of hand height ≈ 15% of hand width
 function stopHand() {
   if (!handEl) return;
   cancelAnims(handEl);
@@ -204,20 +206,21 @@ function stopHand() {
 function handSwing(d, heavy) {
   if (!handEl || reduceMotion()) return;
   const k = heavy ? 1.25 : 1;
+  const drop = Math.round(HAND_DROP * (heavy ? 1.15 : 1));
   cancelAnims(handEl);
   const start = heavy ? H("0%", `${HAND_TENSE.y}%`, HAND_TENSE.r) : H("0%", "0%", 0);
   animate(handEl, [
     { offset: 0,    transform: start },
-    { offset: 0.05, transform: H("0%", "2%", 2) },                                          // pinch the edge
-    { offset: 0.10, transform: H("0%", `${-4 * k}%`, -8 * k), easing: "cubic-bezier(.3,0,.2,1)" }, // lift it
-    { offset: 0.15, transform: H("0%", "0%", 0) },                                          // start down
-    { offset: 0.25, transform: H("-3%", `${6 * k}%`, 14 * k), easing: "ease-out" },          // yank down toward his body
-    { offset: 0.62, transform: H("-2%", "4%", 10 * k) },                                    // stays low with the paper
-    { offset: 0.80, transform: H("0%", "-1%", -3) },                                        // spring back, slight overshoot
+    { offset: 0.05, transform: H("0%", "3%", 3) },                                           // pinch the edge
+    { offset: 0.10, transform: H("0%", `${-8 * k}%`, -16 * k), easing: "cubic-bezier(.3,0,.2,1)" }, // lift it
+    { offset: 0.15, transform: H("0%", "0%", 0) },                                           // start down
+    { offset: 0.25, transform: H("-3%", `${drop}%`, 28 * k), easing: "ease-out" },            // yank down + drop
+    { offset: 0.62, transform: H("-2%", `${Math.round(drop * 0.7)}%`, 20 * k) },              // stays low with the paper
+    { offset: 0.80, transform: H("0%", "-3%", -5) },                                         // spring back, overshoot up
     { offset: 1,    transform: H("0%", "0%", 0) },
   ], { duration: d, fill: "none" });
 }
-// pre-final pause: lift and hold the paper taut, with a ±1° tremble
+// pre-final pause: lift and hold the paper taut, with a ±1.5° tremble
 function handTense(ms) {
   if (!handEl || reduceMotion()) return;
   cancelAnims(handEl);
@@ -225,10 +228,10 @@ function handTense(ms) {
   animate(handEl, [
     { transform: H("0%", "0%", 0) },
     { transform: H("0%", `${y}%`, r), offset: 0.3, easing: "ease-out" },
-    { transform: H("0%", `${y}%`, r + 1), offset: 0.45 },
-    { transform: H("0%", `${y}%`, r - 1), offset: 0.6 },
-    { transform: H("0%", `${y}%`, r + 1), offset: 0.75 },
-    { transform: H("0%", `${y}%`, r - 1), offset: 0.9 },
+    { transform: H("0%", `${y}%`, r + 1.5), offset: 0.45 },
+    { transform: H("0%", `${y}%`, r - 1.5), offset: 0.6 },
+    { transform: H("0%", `${y}%`, r + 1.5), offset: 0.75 },
+    { transform: H("0%", `${y}%`, r - 1.5), offset: 0.9 },
     { transform: H("0%", `${y}%`, r) },
   ], { duration: ms, fill: "forwards" });
 }
@@ -332,6 +335,23 @@ panel.addEventListener("keydown", e => {
 zoomEl.addEventListener("click", closeZoom);
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeZoom(); });
 
+// ── keep the whole card above the sticky buttons (short phones, e.g. 375×667) ──
+// Only scrolls when the card doesn't fit between the top of the screen and the button bar.
+function syncControlsHeight() {
+  if (controlsEl) document.documentElement.style.setProperty("--controls-h", controlsEl.offsetHeight + "px");
+}
+function ensurePanelVisible() {
+  if (!controlsEl) return;
+  syncControlsHeight();
+  const r = panel.getBoundingClientRect();
+  const sticky = getComputedStyle(controlsEl).position === "sticky";
+  const bottomLimit = window.innerHeight - (sticky ? controlsEl.offsetHeight + 8 : 0);
+  if (r.bottom > bottomLimit + 1) {
+    panel.scrollIntoView({ block: "end", behavior: reduceMotion() ? "auto" : "smooth" });
+  }
+}
+window.addEventListener("resize", syncControlsHeight);
+
 // ── states ───────────────────────────────────────────────────────────────
 // 待機：封面紙四邊蓋滿、作品層用 hidden 藏起來（絕不清 src，避免破圖）
 function toIdle() {
@@ -367,6 +387,7 @@ function startDraw() {
   spinning = true;
   closeZoom();                                 // 再抽一次：放大畫面自動關閉
   setZoomable(false);
+  ensurePanelVisible();                        // 短螢幕：捲一次讓整張卡片（含名字）在按鈕上方
 
   // the sheet on top right now: the cover (idle) or the previous winner ("再抽一次")
   const top = winnerSheet || cover;
@@ -521,5 +542,6 @@ function preloadArtworks() {
 }
 
 // 初始狀態
+syncControlsHeight();
 toIdle();
 preloadArtworks();

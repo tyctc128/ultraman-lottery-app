@@ -50,6 +50,7 @@ body {
   width: 57%; height: 55%;
   --grip-x: 0%;                        /* tear point = middle of the sheet's LEFT edge, under his fingertips */
   --grip-y: 48%;
+  scroll-margin-bottom: calc(var(--controls-h, 72px) + 8px);   /* auto-scroll keeps the card above the sticky buttons */
 }
 /* the board itself; overflow visible so a torn sheet can be flung out over Ultraman */
 .panel-inner {
