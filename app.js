@@ -515,14 +515,16 @@ rosterReveal.addEventListener("click", () => { setRevealed(!revealed); });
 document.getElementById("rosterClose").addEventListener("click", closeRoster);
 // backdrop closes only when the press AND the release are both on the backdrop
 // (dragging a text selection out of the textarea must not close the dialog and lose the paste)
-let backdropDown = false;
-rosterEl.addEventListener("pointerdown", e => { backdropDown = e.target === rosterEl; });
-rosterEl.addEventListener("pointerup", e => {
-  const ok = backdropDown && e.target === rosterEl;
-  backdropDown = false;
+// Close inside `click` (not pointerup) so a touch tap can't fall through to 開始 / 重置 underneath.
+let backdropDown = false, backdropUp = false;
+rosterEl.addEventListener("pointerdown", e => { backdropDown = e.target === rosterEl; backdropUp = false; });
+rosterEl.addEventListener("pointerup", e => { backdropUp = backdropDown && e.target === rosterEl; });
+rosterEl.addEventListener("pointercancel", () => { backdropDown = backdropUp = false; });
+rosterEl.addEventListener("click", e => {
+  const ok = backdropDown && backdropUp && e.target === rosterEl;
+  backdropDown = backdropUp = false;
   if (ok) closeRoster();
 });
-rosterEl.addEventListener("pointercancel", () => { backdropDown = false; });
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeRoster(); });
 window.addEventListener("storage", e => {         // another tab saved / cleared the list
   if (e.key !== ROSTER_KEY && e.key !== null) return;
