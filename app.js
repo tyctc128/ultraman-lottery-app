@@ -1,5 +1,5 @@
 // 奧特曼揭牌抽籤 — 純前端靜態網站（GitHub Pages 友善，相對路徑）
-// 撕牌動作 v3：畫面是一疊作品紙，每一抽奧特曼抓住紙角（支點 = 他的手；桌機左上、手機右上）
+// 撕牌動作 v3：奧特曼的手（去背疊圖、手腕為軸）跟著每一撕「抓→扯→彈回」；畫面是一疊作品紙，每一抽奧特曼抓住紙角（支點 = 他的手；桌機左上、手機右上）
 // 把最上面那整張作品往他身體方向（左下）扯下、甩出畫面，露出下一張；最後留下的就是中籤作品。
 
 // 內建作品清單：檔名以相對路徑引用，確保在 /reponame/ 子路徑下也能載入
@@ -19,6 +19,7 @@ const startBtn   = document.getElementById("startBtn");
 const resetBtn   = document.getElementById("resetBtn");
 const sheets     = Array.from(document.querySelectorAll(".sheet"));   // 3 reusable layers
 const shards     = Array.from(document.querySelectorAll(".shard"));   // 3 reusable scraps
+const handEl     = document.getElementById("hand");                     // v3 cut-out hand overlay
 
 const reduceMQ = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
 const reduceMotion = () => !!(reduceMQ && reduceMQ.matches);
@@ -176,6 +177,46 @@ function burst(count) {
   }
 }
 
+// ── v3: the hand (cut-out overlay, pivot = wrist) ──────────────────────
+// Driven with the same d / offsets as tearSheet so it grabs → rips → springs back in sync.
+// Rotation-led (clockwise = fingers pulled down-left toward his body); translation ≤ ~10%
+// of the hand so it never floats off the board frame. % translate is relative to the hand.
+const H = (x, y, r) => `translate(${x}, ${y}) rotate(${r}deg)`;
+const HAND_TENSE_END = 1.5;                       // pose (deg) at the end of the pre-final pause
+function stopHand() {
+  if (!handEl) return;
+  cancelAnims(handEl);
+  if (handEl.getAnimations) handEl.getAnimations().forEach(a => { try { a.cancel(); } catch (e) {} });
+}
+function handRip(d, heavy) {
+  if (!handEl || reduceMotion()) return;
+  const k = heavy ? 1.3 : 1;                      // the final sheet gets a harder yank (≈ +18°)
+  cancelAnims(handEl);
+  animate(handEl, [
+    { offset: 0,    transform: H("0%", "0%", heavy ? HAND_TENSE_END : 0) },
+    { offset: 0.10, transform: H("0%", "3%", 3 * k) },                                   // grip tight
+    { offset: 0.15, transform: H("-2%", "8%", 6 * k), easing: "cubic-bezier(.2,.7,.2,1)" }, // rip starts
+    { offset: 0.25, transform: H(`${-8 * k}%`, `${19 * k}%`, 14 * k) },                  // yank peak (paper flies)
+    { offset: 0.45, transform: H("-5%", "12%", 9 * k), easing: "ease-out" },
+    { offset: 0.75, transform: H("0%", "-2%", -3) },                                     // spring-back overshoot
+    { offset: 1,    transform: H("0%", "0%", 0) },
+  ], { duration: d, fill: "none" });
+}
+// pre-final pause: the hand trembles 0→2° while the paper tautens
+function handTense(ms) {
+  if (!handEl || reduceMotion()) return;
+  cancelAnims(handEl);
+  animate(handEl, [
+    { transform: H("0%", "0%", 0) },
+    { transform: H("0%", "1%", 1), offset: 0.15 },
+    { transform: H("0%", "0%", 0.4), offset: 0.3 },
+    { transform: H("0%", "1.5%", 1.6), offset: 0.5 },
+    { transform: H("0%", "0.5%", 0.8), offset: 0.65 },
+    { transform: H("0%", "2%", 2), offset: 0.82 },
+    { transform: H("0%", "1%", HAND_TENSE_END) },
+  ], { duration: ms, fill: "forwards" });
+}
+
 // pre-final pause: the gripped corner jitters harder and harder (tension).
 // v3: the jitter is mostly translation toward his hand (down-left) with very little
 // rotation, so the far (right) edge never lifts above the board while it tautens.
@@ -202,6 +243,7 @@ const RIP_EASE  = "cubic-bezier(.2,.9,.3,1)";    // 15→25%: the snap of the ri
 const PULL_EASE = "cubic-bezier(.5,0,.9,.6)";    // 25→62%: slow → fast, like being yanked away
 const FLING_EASE = "cubic-bezier(.3,.45,.75,1)"; // 62→100%: carries the speed off the stage
 function tearSheet(el, d, heavy) {
+  handRip(d, heavy);                             // the hand rips in sync (same d, same offsets)
   const grip = heavy
     ? [{ offset: 0, transform: TENSE_END },
        { offset: 0.08, transform: T("2px", "5px", -2, -2.5, 1) },
@@ -239,6 +281,7 @@ function toIdle() {
   spinning = false;
   clearTimers();
   cancelAnims();
+  stopHand();                                  // 重置：手的動畫全部取消，回到原位不殘留角度
   panel.classList.remove("spinning", "won");
   panel.classList.add("idle");
   sheets.forEach(s => { restSheet(s); s.hidden = true; s.firstElementChild.alt = ""; });
@@ -337,6 +380,7 @@ function startDraw() {
     } else {
       // 最後一撕前停頓：紙角抖動加劇，然後重重一扯
       tense(el, PAUSE_MS);
+      handTense(PAUSE_MS);
       later(() => {
         tearSheet(el, FINAL_D, true);
         later(() => {
@@ -354,6 +398,7 @@ function startDraw() {
 function finishDraw(winner, winEl) {
   clearTimers();
   cancelAnims();
+  stopHand();
   sheets.forEach(s => { if (s !== winEl) { restSheet(s); s.hidden = true; } });
   restSheet(winEl);
   winEl.hidden = false;

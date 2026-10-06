@@ -22,8 +22,9 @@ avoid modulo bias), falling back to `Math.random` if unavailable.
 - `index.html` — markup, with a CSP meta and `X-Content-Type-Options: nosniff`
 - `styles.css` — dark sci-fi theme, gold accents, percentage-positioned panel, mobile layout
 - `app.js` — artwork list + tear-off animation (Web Animations API) + draw/reveal logic
-- `hero.webp` — main Ultraman + board backdrop (desktop)
-- `hero-mobile.webp` — Ultraman crop used on narrow screens (≤640px)
+- `hero-nohand.webp` — main Ultraman + board backdrop (desktop), with the gripping hand removed
+- `hero-mobile-nohand.webp` — Ultraman crop used on narrow screens (≤640px), hand removed
+- `hand.webp` — cut-out hand overlaid on the backdrop; on every tear it grips → rips → springs back (wrist pivot, ~+14°, final sheet ~+18°, −3° overshoot), in sync with the paper. Static under `prefers-reduced-motion`.
 - `artworks/art1-traffic.jpg`, `art2-star.jpg`, `art3-sweet.jpg` — three bundled artworks
   (anonymized: nickname labels only, no full names / class numbers; EXIF stripped)
 

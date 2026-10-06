@@ -6,6 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>奧特曼揭牌抽籤</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%86%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -17,12 +18,14 @@
   <main class="wrap">
     <div class="herowrap">
       <picture>
-        <source media="(max-width: 640px)" srcset="hero-mobile.webp">
-        <img class="stageimg" src="hero.webp" alt="奧特曼站在黑板旁">
+        <source media="(max-width: 640px)" srcset="hero-mobile-nohand.webp">
+        <img class="stageimg" src="hero-nohand.webp" alt="奧特曼站在黑板旁">
       </picture>
+      <!-- v3: cut-out hand overlaid on the hand-less hero; it grabs → rips → springs back on every tear -->
+      <img class="hand" id="hand" src="hand.webp" alt="" aria-hidden="true">
     </div>
 
-    <!-- reveal panel positioned over the dark board of hero.webp -->
+    <!-- reveal panel positioned over the dark board of hero-nohand.webp -->
     <div class="panel idle" id="panel">
       <div class="panel-inner">
         <!-- a stack of artwork sheets (3 reusable layers, round-robin; no DOM per tick).
