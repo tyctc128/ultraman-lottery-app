@@ -18,14 +18,14 @@
   <main class="wrap">
     <div class="herowrap">
       <picture>
-        <source media="(max-width: 640px)" srcset="hero-mobile-nohand.webp">
-        <img class="stageimg" src="hero-nohand.webp" alt="奧特曼站在黑板旁">
+        <source media="(max-width: 640px)" srcset="hero-mobile-nohand-right.webp">
+        <img class="stageimg" src="hero-nohand-right.webp" alt="奧特曼站在黑板旁">
       </picture>
-      <!-- v3: cut-out hand overlaid on the hand-less hero; it grabs → rips → springs back on every tear -->
-      <img class="hand" id="hand" src="hand.webp" alt="" aria-hidden="true">
+      <!-- v4: cut-out RIGHT hand overlaid on the (mirrored) hand-less hero; on every tear it lifts up → swings down → springs back -->
+      <img class="hand" id="hand" src="right-hand.webp" alt="" aria-hidden="true">
     </div>
 
-    <!-- reveal panel positioned over the dark board of hero-nohand.webp -->
+    <!-- reveal panel positioned over the dark board of hero-nohand-right.webp -->
     <div class="panel idle" id="panel">
       <div class="panel-inner">
         <!-- a stack of artwork sheets (3 reusable layers, round-robin; no DOM per tick).
