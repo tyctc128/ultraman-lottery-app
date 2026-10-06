@@ -155,7 +155,8 @@ function edgePoly(amp) {
 // v5: back to the original (un-mirrored) hero — Ultraman on the LEFT, paper flung down-left
 // (v2.1 keyframes). MX = 1 keeps every value as written; MX = -1 would mirror x / rotate / skewX.
 const MX = 1;
-const flipX = x => (typeof x === "number" ? x * MX
+const flipX = x => (MX === 1 ? x            // no mirror: keep every value exactly as written
+  : typeof x === "number" ? x * MX
   : (x.startsWith("-") ? x.slice(1) : (parseFloat(x) === 0 ? x : "-" + x)));
 const T = (x, y, r, s, k) => `translate(${flipX(x)}, ${y}) rotate(${r * MX}deg) skewX(${s * MX}deg) scale(${k})`;
 const TENSE_END = T("-3px", "4px", -1.5, -2, 1);   // pose at the end of the pre-final pause (pulled toward his hand, barely rotated)
@@ -192,12 +193,13 @@ function burst(count) {
 // ── v5: the LOWER hand (chest height, reaching to the board; pivot = wrist) ──
 // The upper hand holding the board stays in the background. This one swings around the wrist,
 // with the same d / offsets as tearSheet: pinch → lift (−16°, final −20°) → yank down hard
-// (+28°, final +35°) while the hand also drops ≈ 15% of its width → spring back (−5°).
+// (+28°, final +35°) while the hand also drops 6% of its width (final 8%) → spring back (−5°).
 // Fingers point right, wrist on the left: rotate > 0 = fingers down, < 0 = fingers up.
-// translate % is relative to the hand box (181×78): 15% of its width ≈ 35% of its height.
+// translate % is relative to the hand box (181×78): 6% of its width ≈ 14% of its height, 8% ≈ 19%.
+// (Kept small so the background cuff doesn't read as a second, doubled cuff at the low point.)
 const H = (x, y, r) => `translate(${x}, ${y}) rotate(${r}deg)`;
 const HAND_TENSE = { y: -6, r: -12 };             // pre-final pause: lifted, holding the paper taut
-const HAND_DROP = 35;                             // % of hand height ≈ 15% of hand width
+const HAND_DROP = { normal: 14, heavy: 19 };      // % of hand height ≈ 6% / 8% of hand width
 function stopHand() {
   if (!handEl) return;
   cancelAnims(handEl);
@@ -206,14 +208,14 @@ function stopHand() {
 function handSwing(d, heavy) {
   if (!handEl || reduceMotion()) return;
   const k = heavy ? 1.25 : 1;
-  const drop = Math.round(HAND_DROP * (heavy ? 1.15 : 1));
+  const drop = heavy ? HAND_DROP.heavy : HAND_DROP.normal;
   cancelAnims(handEl);
   const start = heavy ? H("0%", `${HAND_TENSE.y}%`, HAND_TENSE.r) : H("0%", "0%", 0);
   animate(handEl, [
     { offset: 0,    transform: start },
     { offset: 0.05, transform: H("0%", "3%", 3) },                                           // pinch the edge
     { offset: 0.10, transform: H("0%", `${-8 * k}%`, -16 * k), easing: "cubic-bezier(.3,0,.2,1)" }, // lift it
-    { offset: 0.15, transform: H("0%", "0%", 0) },                                           // start down
+    { offset: 0.15, transform: H("0%", "0%", 0), easing: "cubic-bezier(.5,0,.2,1.15)" },     // start down: hard yank, slight overshoot
     { offset: 0.25, transform: H("-3%", `${drop}%`, 28 * k), easing: "ease-out" },            // yank down + drop
     { offset: 0.62, transform: H("-2%", `${Math.round(drop * 0.7)}%`, 20 * k) },              // stays low with the paper
     { offset: 0.80, transform: H("0%", "-3%", -5) },                                         // spring back, overshoot up

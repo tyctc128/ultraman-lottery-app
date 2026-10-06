@@ -24,7 +24,7 @@ avoid modulo bias), falling back to `Math.random` if unavailable.
 - `app.js` — artwork list + tear-off animation (Web Animations API) + draw/reveal logic
 - `hero-nohand-lower.webp` — main backdrop (desktop): Ultraman left of the board, with his lower (reaching) hand removed; the upper hand holding the board stays in the picture
 - `hero-mobile-nohand-lower.webp` — 600×540 crop for narrow screens (≤640px): face + reaching arm, hand removed
-- `lower-hand.webp` — cut-out lower hand overlaid on the backdrop; on every tear it lifts (−16°, final −20°) → yanks down (+28°, final +35°, dropping ≈15% of its width) → springs back (−5°) around the wrist, in sync with the paper, which is pulled from the middle of its left edge and flung down-left. Static under `prefers-reduced-motion`.
+- `lower-hand.webp` — cut-out lower hand overlaid on the backdrop; on every tear it lifts (−16°, final −20°) → yanks down (+28°, final +35°, dropping 6% of its width, final 8%) → springs back (−5°) around the wrist, in sync with the paper, which is pulled from the middle of its left edge and flung down-left. Static under `prefers-reduced-motion`.
 - Click the winning artwork to view it full-screen (click / Esc to close).
 - `artworks/art1-traffic.jpg`, `art2-star.jpg`, `art3-sweet.jpg` — three bundled artworks
   (anonymized: nickname labels only, no full names / class numbers; EXIF stripped)
