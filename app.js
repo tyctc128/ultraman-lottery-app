@@ -20,6 +20,9 @@ const resetBtn   = document.getElementById("resetBtn");
 const sheets     = Array.from(document.querySelectorAll(".sheet"));   // 3 reusable layers
 const shards     = Array.from(document.querySelectorAll(".shard"));   // 3 reusable scraps
 const handEl     = document.getElementById("hand");                     // v3 cut-out hand overlay
+const zoomEl     = document.getElementById("zoom");                     // winner lightbox
+const zoomImg    = document.getElementById("zoomImg");
+const zoomCap    = document.getElementById("zoomCap");
 
 const reduceMQ = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
 const reduceMotion = () => !!(reduceMQ && reduceMQ.matches);
@@ -275,6 +278,47 @@ function tearSheet(el, d, heavy) {
   }
 }
 
+// ── winner zoom (lightbox) ──────────────────────────────────────────────
+// Only the revealed winner can be opened; click anywhere / Esc closes; reset & redraw close it.
+// The caption comes from captionFor() — the single hook for showing a different label later
+// (e.g. a class list kept only on the teacher's own computer). Never written to the repo.
+function captionFor(i) {
+  return ARTWORKS[i].name;
+}
+function openZoom() {
+  if (spinning || !winnerSheet || winnerIdx < 0 || !panel.classList.contains("won")) return;
+  const a = ARTWORKS[winnerIdx];
+  zoomImg.src = a.src;
+  zoomImg.alt = a.name;
+  zoomCap.textContent = captionFor(winnerIdx);   // textContent only (no HTML injection)
+  zoomEl.hidden = false;
+  zoomEl.focus();
+}
+function closeZoom() {
+  if (zoomEl.hidden) return;
+  const hadFocus = zoomEl.contains(document.activeElement) || document.activeElement === zoomEl;
+  zoomEl.hidden = true;
+  zoomCap.textContent = "";
+  if (hadFocus && panel.classList.contains("won")) panel.focus();
+}
+function setZoomable(on) {
+  if (on) {
+    panel.setAttribute("tabindex", "0");
+    panel.setAttribute("role", "button");
+    panel.setAttribute("aria-label", "放大中籤作品");
+  } else {
+    panel.removeAttribute("tabindex");
+    panel.removeAttribute("role");
+    panel.removeAttribute("aria-label");
+  }
+}
+panel.addEventListener("click", openZoom);
+panel.addEventListener("keydown", e => {
+  if ((e.key === "Enter" || e.key === " ") && panel.classList.contains("won")) { e.preventDefault(); openZoom(); }
+});
+zoomEl.addEventListener("click", closeZoom);
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeZoom(); });
+
 // ── states ───────────────────────────────────────────────────────────────
 // 待機：封面紙四邊蓋滿、作品層用 hidden 藏起來（絕不清 src，避免破圖）
 function toIdle() {
@@ -282,6 +326,8 @@ function toIdle() {
   clearTimers();
   cancelAnims();
   stopHand();                                  // 重置：手的動畫全部取消，回到原位不殘留角度
+  closeZoom();
+  setZoomable(false);
   panel.classList.remove("spinning", "won");
   panel.classList.add("idle");
   sheets.forEach(s => { restSheet(s); s.hidden = true; s.firstElementChild.alt = ""; });
@@ -306,6 +352,8 @@ function toIdle() {
 function startDraw() {
   if (spinning || !ready) return;
   spinning = true;
+  closeZoom();                                 // 再抽一次：放大畫面自動關閉
+  setZoomable(false);
 
   // the sheet on top right now: the cover (idle) or the previous winner ("再抽一次")
   const top = winnerSheet || cover;
@@ -414,6 +462,7 @@ function finishDraw(winner, winEl) {
     winnerIdx = winner;
     winEl.firstElementChild.alt = a.name;
     panel.classList.add("won");                // 徽章 🏆 中籤！ 彈出
+    setZoomable(true);                         // 這時才能點作品放大
     artName.textContent = a.name;              // 名字這時才出現（300ms 淡入）
     void artName.offsetWidth;
     artName.classList.add("show");

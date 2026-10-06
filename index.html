@@ -53,6 +53,13 @@
     <div class="hud" id="hud" aria-live="polite" role="status">按下按鈕，看奧特曼替你撕牌抽籤！</div>
   </main>
 
+  <!-- winner zoom (lightbox): opened by clicking the winning artwork, closed by click / Esc -->
+  <div class="zoom" id="zoom" hidden role="dialog" aria-modal="true" aria-label="中籤作品放大" tabindex="-1">
+    <img class="zoomimg" id="zoomImg" src="data:," alt="">
+    <div class="zoomcap" id="zoomCap"></div>
+    <div class="zoomhint">點一下或按 Esc 關閉</div>
+  </div>
+
   <div class="controls">
     <button class="btn" id="startBtn" disabled aria-disabled="true">載入作品中…</button>
     <button class="btn ghost" id="resetBtn">重置</button>

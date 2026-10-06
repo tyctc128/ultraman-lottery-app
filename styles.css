@@ -260,3 +260,51 @@ body {
   }
   .controls .btn { padding: 13px 30px; }
 }
+
+/* ── winner zoom (lightbox) ─────────────────────────────────────────── */
+.panel.won { cursor: zoom-in; }
+.panel.won:focus-visible { outline: 3px solid #ffd23b; outline-offset: 4px; border-radius: 6px; }
+.panel.won .panel-inner::after {
+  content: "🔍 點作品放大";
+  position: absolute; right: 8px; top: 8px; z-index: 13;
+  padding: 3px 10px; border-radius: 14px;
+  background: rgba(0, 0, 0, .55); color: #ffe08a;
+  font-size: clamp(10px, 1.1vw, 14px); font-weight: 700; letter-spacing: 1px;
+  pointer-events: none;
+}
+.zoom {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+  background: rgba(3, 4, 12, .97);
+  cursor: zoom-out;
+}
+.zoomimg {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 110px);
+  max-height: calc(100dvh - 110px);   /* whole artwork always visible, portrait or landscape */
+  width: auto; height: auto;
+  object-fit: contain;
+  background: #fbf8f1; padding: 1.2%;
+  border-radius: 4px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, .7);
+}
+.zoomcap {
+  color: #ffe08a; font-weight: 800; letter-spacing: 2px; text-align: center;
+  font-size: clamp(18px, 3vw, 34px);
+  text-shadow: 0 2px 8px #000;
+}
+.zoomcap:empty { display: none; }
+.zoomhint { color: #8796c2; font-size: 12px; letter-spacing: 1px; }
+@media (prefers-reduced-motion: no-preference) {
+  .zoom:not([hidden]) { animation: zoomfade .2s ease-out; }
+  .zoom:not([hidden]) .zoomimg { animation: zoompop .25s cubic-bezier(.2, .9, .3, 1.15); }
+}
+@keyframes zoomfade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes zoompop { from { transform: scale(.85); } to { transform: scale(1); } }
+@media (max-height: 460px) {           /* phone landscape: give the artwork almost all the height */
+  .zoom { flex-direction: row; gap: 14px; }
+  .zoomimg { max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); max-width: 78%; }
+  .zoomhint { display: none; }
+}
