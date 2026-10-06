@@ -1,5 +1,5 @@
 // 奧特曼揭牌抽籤 — 純前端靜態網站（GitHub Pages 友善，相對路徑）
-// 撕牌動作 v2：畫面是一疊作品紙，每一抽奧特曼抓住左上角（支點 = 他的手）
+// 撕牌動作 v3：畫面是一疊作品紙，每一抽奧特曼抓住紙角（支點 = 他的手；桌機左上、手機右上）
 // 把最上面那整張作品往他身體方向（左下）扯下、甩出畫面，露出下一張；最後留下的就是中籤作品。
 
 // 內建作品清單：檔名以相對路徑引用，確保在 /reponame/ 子路徑下也能載入
@@ -145,7 +145,7 @@ function edgePoly(amp) {
 }
 
 const T = (x, y, r, s, k) => `translate(${x}, ${y}) rotate(${r}deg) skewX(${s}deg) scale(${k})`;
-const TENSE_END = T("0px", "0px", -3, -3, 1);   // pose at the end of the pre-final pause
+const TENSE_END = T("-3px", "4px", -1.5, -2, 1);   // pose at the end of the pre-final pause (pulled toward his hand, barely rotated)
 
 // the stage shakes once at the moment of the rip
 function shake(heavy) {
@@ -176,37 +176,46 @@ function burst(count) {
   }
 }
 
-// pre-final pause: the gripped corner jitters harder and harder (tension)
+// pre-final pause: the gripped corner jitters harder and harder (tension).
+// v3: the jitter is mostly translation toward his hand (down-left) with very little
+// rotation, so the far (right) edge never lifts above the board while it tautens.
 function tense(el, ms) {
   animate(el, [
     { transform: T("0px", "0px", 0, 0, 1) },
-    { transform: T("2px", "1px", -1.5, -1, 1), offset: 0.12 },
-    { transform: T("-1px", "2px", -1, -1.5, 1), offset: 0.25 },
-    { transform: T("3px", "0px", -2.5, -2, 1), offset: 0.4 },
-    { transform: T("-2px", "3px", -2, -2.5, 1), offset: 0.55 },
-    { transform: T("4px", "1px", -3.5, -3, 1), offset: 0.7 },
-    { transform: T("-3px", "3px", -3, -3.5, 1), offset: 0.85 },
+    { transform: T("2px", "2px", -0.5, -1, 1), offset: 0.12 },
+    { transform: T("-2px", "1px", -0.3, -1.5, 1), offset: 0.25 },
+    { transform: T("3px", "3px", -0.9, -2, 1), offset: 0.4 },
+    { transform: T("-3px", "2px", -0.6, -2.5, 1), offset: 0.55 },
+    { transform: T("4px", "4px", -1.3, -3, 1), offset: 0.7 },
+    { transform: T("-4px", "3px", -1, -3.5, 1), offset: 0.85 },
     { transform: TENSE_END },
   ], { duration: ms, fill: "forwards" });
 }
 
 // one tear of the top sheet over duration d (pivot = grip corner via CSS transform-origin):
-//  0–15% grip (paper tautens + 2px jitter) · 15–25% rip open (+ stage shake)
-//  25–100% fling down-left off the board, fading out over the last 20%
+//  0–15% grip (paper tautens + 2px jitter, almost no rotation) · 15–25% rip open (+ stage shake)
+//  25–100% pulled DOWN-LEFT toward his hand/body and out past his feet (translation leads,
+//  rotation follows), fading out over the last 20%
 //  from 15% the top + right edges turn jagged · at 25% scraps burst from those edges
+// v3 trajectory (UI/UX spec): 25% ≈ translate(-10%, 6%) rotate(-6deg) → 100% ≈ translate(-90%, 70%) rotate(-25deg)
+const RIP_EASE  = "cubic-bezier(.2,.9,.3,1)";    // 15→25%: the snap of the rip
+const PULL_EASE = "cubic-bezier(.5,0,.9,.6)";    // 25→62%: slow → fast, like being yanked away
+const FLING_EASE = "cubic-bezier(.3,.45,.75,1)"; // 62→100%: carries the speed off the stage
 function tearSheet(el, d, heavy) {
   const grip = heavy
     ? [{ offset: 0, transform: TENSE_END },
-       { offset: 0.08, transform: T("3px", "2px", -3.5, -3.5, 1) },
-       { offset: 0.15, transform: T("0px", "0px", -4, -3, 1), easing: "cubic-bezier(.2,.9,.3,1)" },
-       { offset: 0.25, transform: T("-6%", "11%", -18, 0, 1), easing: "cubic-bezier(.55,0,.85,.35)" },
-       { offset: 1, transform: T("-60%", "130%", -42, 0, 0.9) }]
+       { offset: 0.08, transform: T("2px", "5px", -2, -2.5, 1) },
+       { offset: 0.15, transform: T("-2%", "2.5%", -2.5, -2, 1), easing: RIP_EASE },
+       { offset: 0.25, transform: T("-12%", "8%", -7, 0, 1), easing: PULL_EASE },
+       { offset: 0.62, transform: T("-46%", "34%", -15, 0, 0.96), easing: FLING_EASE },
+       { offset: 1, transform: T("-95%", "75%", -27, 0, 0.9) }]
     : [{ offset: 0, transform: T("0px", "0px", 0, 0, 1) },
-       { offset: 0.05, transform: T("1px", "2px", -1, -1, 1) },
-       { offset: 0.10, transform: T("2px", "0px", -1.5, -1.5, 1) },
-       { offset: 0.15, transform: T("0px", "0px", -2, -2, 1), easing: "cubic-bezier(.2,.9,.3,1)" },
-       { offset: 0.25, transform: T("-4%", "8%", -14, 0, 1), easing: "cubic-bezier(.55,0,.85,.35)" },
-       { offset: 1, transform: T("-55%", "120%", -38, 0, 0.92) }];
+       { offset: 0.05, transform: T("1px", "2px", -0.5, -1, 1) },
+       { offset: 0.10, transform: T("2px", "1px", -0.8, -1.5, 1) },
+       { offset: 0.15, transform: T("-1%", "1.5%", -1.2, -1.5, 1), easing: RIP_EASE },
+       { offset: 0.25, transform: T("-10%", "6%", -6, 0, 1), easing: PULL_EASE },
+       { offset: 0.62, transform: T("-42%", "31%", -13, 0, 0.97), easing: FLING_EASE },
+       { offset: 1, transform: T("-90%", "70%", -25, 0, 0.92) }];
   animate(el, grip, { duration: d, fill: "forwards" });
 
   const intact = edgePoly(0), torn = edgePoly(heavy ? 5.5 : 3.2);

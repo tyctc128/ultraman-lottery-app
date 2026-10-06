@@ -198,30 +198,35 @@ body {
 .btn:not(.ghost):disabled { border-width: 2px; }
 .btn:disabled:active { transform: none; }
 
-/* mobile: Ultraman image on top (sides cropped), reveal panel as a full-width
-   card below it, buttons fixed at an easy-to-reach bottom position. */
+/* mobile (v3): hero-mobile.webp is a 640×250 crop of his upper body; the hand gripping
+   the board corner sits at the bottom-right of the image. The reveal card is laid
+   directly under the image so its top-right corner is right at his hand, and the tear
+   pivots there (top-right) and flings down-left toward his body. Buttons stay fixed
+   at an easy-to-reach bottom position. */
 @media (max-width: 640px) {
   body { padding-bottom: 96px; }
   .wrap { max-width: 100%; }
   .herowrap {
-    height: 38vh;
+    height: auto;
     overflow: hidden;
-    border-radius: 0 0 10px 10px;
+    border-radius: 0;
   }
   .stageimg {
     width: 100%; height: auto;
+    aspect-ratio: 640 / 250;            /* reserve space before the image loads (no layout jump) */
     display: block;
-    margin-top: -5%;
+    margin-top: 0;
+    border-radius: 0;
   }
   .panel {
     position: relative;
     left: auto; top: auto;
     width: calc(100% - 24px); max-width: 520px; height: auto;
     aspect-ratio: 4 / 3;
-    margin: 30px auto 6px;
-    /* hero-mobile.webp: his hand grips the board's top edge at ≈ x81% / y18% of the
-       image, i.e. above the card's top edge at ≈ 82% across → pivot there */
-    --grip-x: 82%;
+    margin: -4px auto 6px;              /* card butts straight onto the bottom of the hero */
+    /* hand ≈ x84% / y78% of hero-mobile.webp → at 390px wide it is ≈ 20px above the
+       card's top edge at ≈ 85% across the card → pivot = card top-right ≈ 85% / 0% */
+    --grip-x: 85%;
     --grip-y: 0%;
   }
   .panel-inner { border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.5), inset 0 0 0 2px rgba(255,210,59,.1); }
