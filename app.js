@@ -1,4 +1,6 @@
 // 奧特曼揭牌抽籤 — 純前端靜態網站（GitHub Pages 友善，相對路徑）
+// 撕牌動作 v2：畫面是一疊作品紙，每一抽奧特曼抓住左上角（支點 = 他的手）
+// 把最上面那整張作品往他身體方向（左下）扯下、甩出畫面，露出下一張；最後留下的就是中籤作品。
 
 // 內建作品清單：檔名以相對路徑引用，確保在 /reponame/ 子路徑下也能載入
 const ARTWORKS = [
@@ -7,23 +9,40 @@ const ARTWORKS = [
   { src: "artworks/art3-sweet.jpg",   name: "可愛甜美王國 · 小喬" },
 ];
 
-const panel     = document.getElementById("panel");
-const artImg    = document.getElementById("artimg");
-const artName   = document.getElementById("artname");
+const wrap       = document.querySelector(".wrap");
+const panel      = document.getElementById("panel");
+const cover      = document.getElementById("cover");
+const coverLabel = document.getElementById("coverLabel");
+const artName    = document.getElementById("artname");
 const hud        = document.getElementById("hud");
 const startBtn   = document.getElementById("startBtn");
 const resetBtn   = document.getElementById("resetBtn");
-const papers     = Array.from(document.querySelectorAll(".paper"));
-const paperLabels = papers.map(p => p.querySelector(".plabel"));
+const sheets     = Array.from(document.querySelectorAll(".sheet"));   // 3 reusable layers
+const shards     = Array.from(document.querySelectorAll(".shard"));   // 3 reusable scraps
 
-const prefersReducedMotion =
-  window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const reduceMQ = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+const reduceMotion = () => !!(reduceMQ && reduceMQ.matches);
+const canAnimate = typeof Element !== "undefined" && typeof Element.prototype.animate === "function";
 
-let spinning   = false;
-let cycleTimer = null;   // setTimeout id for the cover/next-tick chain
-let rafId      = null;   // requestAnimationFrame id (so we can cancel a stray tick)
-let activePaper = 0;     // index of the paper layer currently covering the board
-let ready       = false; // true once all artworks are preloaded
+// ── rhythm (total ≈ 3.2 s) ───────────────────────────────────────────────
+const TEARS     = 8;     // sheets torn per draw (top sheet + 7 fillers; winner is always last)
+const FINAL_D   = 520;   // the heavy final rip
+const PAUSE_MS  = 400;   // tense pause (corner jitter) before the final rip
+const REVEAL_MS = 250;   // winner revealed → wait → badge pops + name fades in
+// pre-final tear durations: 180ms → … → 550ms (second-to-last), progressively slower
+const DUR = Array.from({ length: TEARS - 1 }, (_, i) =>
+  Math.round(180 + 370 * Math.pow(i / (TEARS - 2), 3)));
+// gaps between pre-final tears: 40ms → 80ms
+const GAP = Array.from({ length: TEARS - 2 }, (_, i) =>
+  Math.round(40 + 40 * Math.pow(i / (TEARS - 3), 2)));
+
+let spinning    = false;
+let rafId       = null;      // requestAnimationFrame id (so we can cancel a stray tick)
+let timers      = new Set(); // every pending setTimeout of the current draw
+let anims       = [];        // every running Web Animation of the current draw
+let ready       = false;     // true once all artworks are preloaded
+let winnerSheet = null;      // sheet element showing the current winner (won state)
+let winnerIdx   = -1;
 
 // 均勻亂數：優先使用 crypto，fallback 到 Math.random（已驗證公平，勿改）
 function uniformIndex(n) {
@@ -38,158 +57,329 @@ function uniformIndex(n) {
   return Math.floor(Math.random() * n);
 }
 
-function setPaperLabel(text) {
-  paperLabels.forEach(l => { if (l) l.textContent = text; });
+// ── helpers ──────────────────────────────────────────────────────────────
+function setDisabled(btn, v) {
+  btn.disabled = v;
+  if (v) btn.setAttribute("aria-disabled", "true");
+  else btn.removeAttribute("aria-disabled");
 }
 
-function showArt(i) {
-  const a = ARTWORKS[i];
-  artImg.src = a.src;
-  artImg.alt = a.name;
-  artName.textContent = a.name;
-}
-
-function hideArt() {
-  artImg.removeAttribute("src");
-  artImg.alt = "";
-  artName.textContent = "";
-}
-
-// 讓第 idx 層紙蓋住黑板，其餘收起（撕掉或停在待命位置）
-function coverWith(idx) {
-  papers.forEach((p, k) => {
-    if (k === idx) {
-      p.classList.remove("tearing");
-      p.classList.add("covering");
-    } else {
-      p.classList.remove("covering");
-    }
-  });
-}
-
-// 撕掉第 idx 層紙（往上甩飛、旋轉、淡出，露出底下作品）
-function tear(idx) {
-  const p = papers[idx];
-  p.classList.remove("covering");
-  p.classList.add("tearing");
+// setTimeout that is tracked (cancelled on reset) and only fires while a draw is running
+function later(fn, ms) {
+  const id = setTimeout(() => { timers.delete(id); if (spinning) fn(); }, ms);
+  timers.add(id);
+  return id;
 }
 
 function clearTimers() {
-  if (cycleTimer) { clearTimeout(cycleTimer); cycleTimer = null; }
-  if (rafId)      { cancelAnimationFrame(rafId); rafId = null; }
+  timers.forEach(id => clearTimeout(id));
+  timers.clear();
+  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
 }
 
-// 待機：一張完整封紙蓋著、不顯示任何作品（避免暴雷）
+function animate(el, keyframes, opts) {
+  if (!canAnimate) return null;
+  const a = el.animate(keyframes, opts);
+  anims.push({ el, a });
+  return a;
+}
+
+function cancelAnims(el) {
+  anims = anims.filter(r => {
+    if (el && r.el !== el) return true;
+    try { r.a.cancel(); } catch (e) { /* ignore */ }
+    return false;
+  });
+}
+
+// put a sheet back to a clean resting state (never touches the img src)
+function restSheet(el) {
+  cancelAnims(el);
+  el.classList.remove("fadeout", "fadein", "fadein-start");
+  el.style.zIndex = "";
+}
+
+// load artwork i onto a sheet. Never sets src="" / removes src (no broken-image icon).
+function loadSheet(el, i) {
+  const img = el.firstElementChild;
+  if (img.getAttribute("src") !== ARTWORKS[i].src) img.src = ARTWORKS[i].src;
+  img.alt = "";                // filler sheets are decorative while cycling (no spoiler)
+  el.dataset.art = String(i);
+  restSheet(el);
+  el.hidden = false;
+}
+
+// z-order of the stack, top first
+function applyZ(stack) {
+  stack.forEach((el, k) => { el.style.zIndex = String(10 - k); });
+}
+
+// random but non-consecutive filler artworks; the winner is always last.
+// Built backwards from the winner so the sheet right above the winner differs from it,
+// and the first filler differs from whatever is on top right now.
+function buildFillers(winner, prevTop, count) {
+  const n = ARTWORKS.length;
+  const out = new Array(count);
+  let below = winner;
+  for (let k = count - 1; k >= 0; k--) {
+    let cand = [];
+    for (let i = 0; i < n; i++) if (i !== below && (k > 0 || i !== prevTop)) cand.push(i);
+    if (!cand.length) for (let i = 0; i < n; i++) if (i !== below) cand.push(i);
+    if (!cand.length) cand = [below];               // only one artwork: repeats unavoidable
+    out[k] = cand[uniformIndex(cand.length)];
+    below = out[k];
+  }
+  return out;
+}
+
+// clip-path for a sheet whose top + right edges are torn (amp = 0 → intact rectangle).
+// Same vertex count either way so the browser can morph intact → jagged.
+function edgePoly(amp) {
+  const N = 14, M = 10, ax = amp * 0.75, pts = ["0% 0%"];
+  const jag = (a, odd) => a ? (odd ? a * (0.5 + Math.random()) : a * 0.15 * Math.random()) : 0;
+  for (let i = 1; i < N; i++) pts.push(`${(i / N * 100).toFixed(2)}% ${jag(amp, i % 2).toFixed(2)}%`);
+  pts.push(amp ? `${(100 - ax).toFixed(2)}% ${(amp * 0.9).toFixed(2)}%` : "100% 0%");
+  for (let j = 1; j < M; j++) pts.push(`${(100 - jag(ax, j % 2)).toFixed(2)}% ${(j / M * 100).toFixed(2)}%`);
+  pts.push(`${(100 - (amp ? ax * 0.3 : 0)).toFixed(2)}% 100%`, "0% 100%");
+  return `polygon(${pts.join(", ")})`;
+}
+
+const T = (x, y, r, s, k) => `translate(${x}, ${y}) rotate(${r}deg) skewX(${s}deg) scale(${k})`;
+const TENSE_END = T("0px", "0px", -3, -3, 1);   // pose at the end of the pre-final pause
+
+// the stage shakes once at the moment of the rip
+function shake(heavy) {
+  const a = heavy ? 5 : 3, b = heavy ? 3 : 2;
+  animate(wrap, heavy
+    ? [{ transform: "translate(0,0)" }, { transform: `translate(-${a}px,${b}px)` },
+       { transform: `translate(${a - 1}px,-${b - 1}px)` }, { transform: "translate(-2px,1px)" },
+       { transform: "translate(0,0)" }]
+    : [{ transform: "translate(0,0)" }, { transform: `translate(-${a}px,${b}px)` },
+       { transform: "translate(0,0)" }],
+    { duration: heavy ? 160 : 80, easing: "ease-out" });
+}
+
+// 1–2 scraps (3 on the final rip) burst from the top / right edges, drift up-right 20px
+function burst(count) {
+  for (let i = 0; i < count && i < shards.length; i++) {
+    const sh = shards[i];
+    if (i % 2 === 0) { sh.style.left = (35 + Math.random() * 55).toFixed(1) + "%"; sh.style.top = "0%"; }
+    else             { sh.style.left = "100%"; sh.style.top = (8 + Math.random() * 50).toFixed(1) + "%"; }
+    sh.hidden = false;
+    const rot = (Math.random() < 0.5 ? -1 : 1) * (90 + Math.random() * 120);
+    cancelAnims(sh);
+    animate(sh, [
+      { transform: "translate(0px,0px) rotate(0deg)", opacity: 1 },
+      { transform: `translate(20px,-20px) rotate(${rot.toFixed(0)}deg)`, opacity: 0 },
+    ], { duration: 250, easing: "ease-out", fill: "forwards" });
+    later(() => { sh.hidden = true; cancelAnims(sh); }, 260);
+  }
+}
+
+// pre-final pause: the gripped corner jitters harder and harder (tension)
+function tense(el, ms) {
+  animate(el, [
+    { transform: T("0px", "0px", 0, 0, 1) },
+    { transform: T("2px", "1px", -1.5, -1, 1), offset: 0.12 },
+    { transform: T("-1px", "2px", -1, -1.5, 1), offset: 0.25 },
+    { transform: T("3px", "0px", -2.5, -2, 1), offset: 0.4 },
+    { transform: T("-2px", "3px", -2, -2.5, 1), offset: 0.55 },
+    { transform: T("4px", "1px", -3.5, -3, 1), offset: 0.7 },
+    { transform: T("-3px", "3px", -3, -3.5, 1), offset: 0.85 },
+    { transform: TENSE_END },
+  ], { duration: ms, fill: "forwards" });
+}
+
+// one tear of the top sheet over duration d (pivot = grip corner via CSS transform-origin):
+//  0–15% grip (paper tautens + 2px jitter) · 15–25% rip open (+ stage shake)
+//  25–100% fling down-left off the board, fading out over the last 20%
+//  from 15% the top + right edges turn jagged · at 25% scraps burst from those edges
+function tearSheet(el, d, heavy) {
+  const grip = heavy
+    ? [{ offset: 0, transform: TENSE_END },
+       { offset: 0.08, transform: T("3px", "2px", -3.5, -3.5, 1) },
+       { offset: 0.15, transform: T("0px", "0px", -4, -3, 1), easing: "cubic-bezier(.2,.9,.3,1)" },
+       { offset: 0.25, transform: T("-6%", "11%", -18, 0, 1), easing: "cubic-bezier(.55,0,.85,.35)" },
+       { offset: 1, transform: T("-60%", "130%", -42, 0, 0.9) }]
+    : [{ offset: 0, transform: T("0px", "0px", 0, 0, 1) },
+       { offset: 0.05, transform: T("1px", "2px", -1, -1, 1) },
+       { offset: 0.10, transform: T("2px", "0px", -1.5, -1.5, 1) },
+       { offset: 0.15, transform: T("0px", "0px", -2, -2, 1), easing: "cubic-bezier(.2,.9,.3,1)" },
+       { offset: 0.25, transform: T("-4%", "8%", -14, 0, 1), easing: "cubic-bezier(.55,0,.85,.35)" },
+       { offset: 1, transform: T("-55%", "120%", -38, 0, 0.92) }];
+  animate(el, grip, { duration: d, fill: "forwards" });
+
+  const intact = edgePoly(0), torn = edgePoly(heavy ? 5.5 : 3.2);
+  animate(el, [
+    { offset: 0, clipPath: intact }, { offset: 0.15, clipPath: intact },
+    { offset: 0.19, clipPath: torn }, { offset: 1, clipPath: torn },
+  ], { duration: d, fill: "forwards" });
+
+  animate(el, [{ opacity: 1 }, { opacity: 0 }],
+    { duration: d * 0.2, delay: d * 0.8, fill: "forwards" });
+
+  if (canAnimate) {
+    later(() => shake(heavy), d * 0.15);
+    later(() => burst(heavy ? 3 : 1 + (Math.random() < 0.5 ? 1 : 0)), d * 0.25);
+  }
+}
+
+// ── states ───────────────────────────────────────────────────────────────
+// 待機：封面紙四邊蓋滿、作品層用 hidden 藏起來（絕不清 src，避免破圖）
 function toIdle() {
   spinning = false;
   clearTimers();
+  cancelAnims();
   panel.classList.remove("spinning", "won");
   panel.classList.add("idle");
-  hideArt();
-  papers.forEach(p => p.classList.remove("tearing"));
-  activePaper = 0;
-  coverWith(0);
-  setPaperLabel("等待撕牌");
+  sheets.forEach(s => { restSheet(s); s.hidden = true; s.firstElementChild.alt = ""; });
+  shards.forEach(sh => { sh.hidden = true; });
+  cover.classList.remove("fadeout");
+  cover.style.zIndex = "";
+  cover.hidden = false;
+  coverLabel.hidden = false;
+  coverLabel.textContent = "等待撕牌";
+  artName.classList.remove("show");
+  artName.textContent = "";
+  winnerSheet = null;
+  winnerIdx = -1;
   hud.textContent = ready
     ? "按下按鈕，看奧特曼替你撕牌抽籤！"
     : "作品載入中…";
-  startBtn.disabled = !ready;
+  setDisabled(startBtn, !ready);
   startBtn.textContent = ready ? "開始撕牌抽籤 ✦" : "載入作品中…";
-  resetBtn.disabled = false;
+  setDisabled(resetBtn, false);
 }
 
 function startDraw() {
   if (spinning || !ready) return;
   spinning = true;
+
+  // the sheet on top right now: the cover (idle) or the previous winner ("再抽一次")
+  const top = winnerSheet || cover;
+  const prevTop = winnerSheet ? winnerIdx : -1;
+  winnerSheet = null;
+  winnerIdx = -1;
+  if (top !== cover) top.firstElementChild.alt = "";
+
   panel.classList.remove("won", "idle");
   panel.classList.add("spinning");
-  startBtn.disabled = true;
-  resetBtn.disabled = true;           // 抽籤中禁用重置，避免殘留排程弄亂狀態
-  setPaperLabel("撕牌中…");
-  hud.textContent = "奧特曼正在撕牌… ✦ ✦ ✦";
+  artName.classList.remove("show");
+  artName.textContent = "";                    // 輪播期間名字欄一律空白（防暴雷）
+  setDisabled(startBtn, true);
+  setDisabled(resetBtn, true);                 // 抽籤中禁用重置，避免殘留排程弄亂狀態
+  coverLabel.textContent = "撕牌中…";
+  hud.textContent = "奧特曼正在撕牌…";
 
   const winner = uniformIndex(ARTWORKS.length);
+  const free = sheets.filter(s => s !== top);
 
-  // 無障礙：使用者偏好減少動態時，跳過輪播，直接淡入結果
-  if (prefersReducedMotion) {
-    showArt(winner);
-    tear(activePaper);
-    finishDraw(winner);
+  // 減少動態：不撕、不震 — 封面紙淡出 → 中籤作品淡入 → 名字＋徽章
+  if (reduceMotion()) {
+    const ws = free[0];
+    free.slice(1).forEach(s => { s.hidden = true; });
+    loadSheet(ws, winner);
+    ws.classList.add("fadein-start");
+    applyZ([top, ws]);
+    top.classList.add("fadeout");
+    later(() => {
+      top.hidden = true;
+      void ws.offsetWidth;
+      ws.classList.remove("fadein-start");
+      ws.classList.add("fadein");
+      later(() => finishDraw(winner, ws), 360);
+    }, 360);
     return;
   }
 
-  const totalMs = 2800;              // 總時長 ~2.8s（落在 2–3s）
-  const start = performance.now();
-  let lastIdx = -1;
+  // the stack (top first): current top, then fillers…, winner last. 3 layers round-robin.
+  const seq = buildFillers(winner, prevTop, TEARS - 1).concat([winner]);
+  const stack = [top];
+  let next = 0;
+  free.forEach(s => {
+    if (next < seq.length) { loadSheet(s, seq[next++]); stack.push(s); }
+    else s.hidden = true;
+  });
+  applyZ(stack);
 
-  function tick(now) {
-    if (!spinning) return;           // 擋掉任何殘留的 tick
-    const elapsed = now - start;
-    const t = Math.min(elapsed / totalMs, 1);
-    // ease-out：每張停留間隔隨 t 增大而拉長（減速）
-    const interval = 180 + t * t * 520;  // ~180ms -> ~700ms
+  // a torn sheet leaves: back to the bottom of the stack with the next artwork (no new DOM)
+  function recycle() {
+    const el = stack.shift();
+    if (el === cover) { cancelAnims(cover); cover.hidden = true; }
+    else if (next < seq.length) { loadSheet(el, seq[next++]); stack.push(el); }
+    else { restSheet(el); el.hidden = true; }
+    applyZ(stack);
+  }
 
-    // 最後一張：停在真正中籤者、撕開不再蓋回
-    if (t >= 1) {
-      showArt(winner);
-      tear(activePaper);
-      finishDraw(winner);
-      return;
+  let step = 0;
+  function tick() {
+    if (!spinning) return;                     // 擋掉任何殘留的 tick
+    rafId = null;
+    const el = stack[0];
+    if (step < TEARS - 1) {
+      const d = DUR[step];
+      tearSheet(el, d, false);
+      later(() => {
+        recycle();
+        step += 1;
+        const gap = step < TEARS - 1 ? GAP[step - 1] : 0;
+        later(() => { rafId = requestAnimationFrame(tick); }, gap);
+      }, d);
+    } else {
+      // 最後一撕前停頓：紙角抖動加劇，然後重重一扯
+      tense(el, PAUSE_MS);
+      later(() => {
+        tearSheet(el, FINAL_D, true);
+        later(() => {
+          recycle();
+          finishDraw(winner, stack[0]);       // the winner is always the last sheet
+        }, FINAL_D);
+      }, PAUSE_MS);
     }
-
-    // 換到目前封紙底下（蓋著，不暴雷），再撕飛這張、露出作品
-    let idx;
-    do { idx = uniformIndex(ARTWORKS.length); } while (idx === lastIdx && ARTWORKS.length > 1);
-    lastIdx = idx;
-    showArt(idx);
-    tear(activePaper);
-
-    // 作品露出 ~0.1–0.3s 後，蓋上下一張紙，再排下一個 tick
-    const hold = Math.min(interval * 0.5, 280);
-    cycleTimer = setTimeout(() => {
-      if (!spinning) return;
-      activePaper = (activePaper + 1) % papers.length;
-      coverWith(activePaper);
-      cycleTimer = setTimeout(() => {
-        if (!spinning) return;
-        rafId = requestAnimationFrame(tick);
-      }, Math.max(interval - hold, 70));
-    }, hold);
   }
   rafId = requestAnimationFrame(tick);
 }
 
-function finishDraw(winner) {
-  spinning = false;
+// 收尾：只留中籤那張；已扯走的紙、碎屑、「撕牌中…」全部 display:none。
+// 等 250ms → 徽章彈出 → 名字這時才淡入（名字只在這裡寫入）。
+function finishDraw(winner, winEl) {
   clearTimers();
+  cancelAnims();
+  sheets.forEach(s => { if (s !== winEl) { restSheet(s); s.hidden = true; } });
+  restSheet(winEl);
+  winEl.hidden = false;
+  shards.forEach(sh => { sh.hidden = true; });
+  coverLabel.hidden = true;
+  cover.hidden = true;
   panel.classList.remove("spinning");
-  panel.classList.add("won");         // 封紙撕開飛走 + 金色徽章彈跳
-  tear(activePaper);                  // 確保最後一張封紙保持撕開狀態
+
   const a = ARTWORKS[winner];
-  hud.textContent = "🏆 今天的幸運之星：" + a.name + "！";
-  startBtn.disabled = false;
-  startBtn.textContent = "再抽一次 ✦";
-  resetBtn.disabled = false;
+  later(() => {
+    spinning = false;
+    winnerSheet = winEl;
+    winnerIdx = winner;
+    winEl.firstElementChild.alt = a.name;
+    panel.classList.add("won");                // 徽章 🏆 中籤！ 彈出
+    artName.textContent = a.name;              // 名字這時才出現（300ms 淡入）
+    void artName.offsetWidth;
+    artName.classList.add("show");
+    hud.textContent = "🏆 今天的幸運之星：" + a.name + "！";
+    setDisabled(startBtn, false);
+    startBtn.textContent = "再抽一次 ✦";
+    setDisabled(resetBtn, false);
+  }, REVEAL_MS);
 }
 
 startBtn.addEventListener("click", () => {
   if (spinning || !ready) return;
-  if (panel.classList.contains("won")) {
-    // 再抽一次：先回到蓋牌、隱藏作品的狀態再開始
-    panel.classList.remove("won");
-    hideArt();
-    papers.forEach(p => p.classList.remove("tearing"));
-    activePaper = 0;
-    coverWith(0);
-  }
-  startDraw();
+  startDraw();                                 // 再抽一次：直接從目前那張中籤作品開始撕
 });
 resetBtn.addEventListener("click", () => {
-  if (spinning) return;              // 抽籤中按鈕已 disabled，雙重保險
+  if (spinning) return;                        // 抽籤中按鈕已 disabled，雙重保險
   toIdle();
 });
 
-// 預先載入所有作品，載完才啟用開始按鈕（避免第一抽閃白）
+// 預先載入所有作品（含解碼），載完才啟用開始按鈕（避免第一抽閃白）
 function preloadArtworks() {
   let remaining = ARTWORKS.length;
   const done = () => {
@@ -197,7 +387,7 @@ function preloadArtworks() {
     if (remaining <= 0) {
       ready = true;
       if (!spinning && !panel.classList.contains("won")) {
-        startBtn.disabled = false;
+        setDisabled(startBtn, false);
         startBtn.textContent = "開始撕牌抽籤 ✦";
         hud.textContent = "按下按鈕，看奧特曼替你撕牌抽籤！";
       }
@@ -205,8 +395,11 @@ function preloadArtworks() {
   };
   ARTWORKS.forEach(a => {
     const img = new Image();
-    img.onload = done;
-    img.onerror = done;             // 載入失敗也放行，避免卡死按鈕
+    img.onload = () => {
+      if (img.decode) img.decode().then(done, done);
+      else done();
+    };
+    img.onerror = done;                        // 載入失敗也放行，避免卡死按鈕
     img.src = a.src;
   });
 }

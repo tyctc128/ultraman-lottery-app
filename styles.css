@@ -21,40 +21,81 @@ body {
 .topbar .spark { -webkit-text-fill-color: #ffd23b; }
 .subtitle { margin-top: 8px; color: #aebbe0; font-size: clamp(12px, 1.3vw, 16px); letter-spacing: 1px; }
 
-/* stage: hero image with the reveal panel overlaid */
-.wrap { position: relative; width: 100%; max-width: 1200px; margin: 10px auto 0; }
+/* stage: hero image with the reveal panel overlaid.
+   overflow is clipped so a sheet flung off the board slides off the stage
+   (no page scrollbars flicker while it flies). */
+[hidden] { display: none !important; }
+.wrap { position: relative; width: 100%; max-width: 1200px; margin: 10px auto 0; overflow: hidden; }
 .stageimg { display: block; width: 100%; height: auto; border-radius: 10px; }
 
 /* reveal panel aligned to the blackboard inner frame of hero.webp.
-   overflow is visible so the winner badge can ride on the frame;
-   the inner box clips the artwork + paper layers. */
+   --grip-x / --grip-y = where Ultraman's hand grips the top sheet (the tear pivot),
+   in % of the panel. Desktop: his hand holds the board's top-left corner
+   (hand ≈ x35% / y19.5% of hero.webp, panel corner at 37.5% / 21.5%) → pivot 0 0. */
 .panel {
   position: absolute;
   left: 37.5%; top: 21.5%;
   width: 51%; height: 55%;
+  --grip-x: 0%;
+  --grip-y: 0%;
 }
+/* the board itself; overflow visible so a torn sheet can be flung out over Ultraman */
 .panel-inner {
   position: absolute; inset: 0;
   border-radius: 6px;
-  overflow: hidden;
   background: #1c130a;
   box-shadow: 0 8px 28px rgba(0, 0, 0, .55), inset 0 0 0 2px rgba(255, 210, 59, .08);
 }
 
-/* the artwork underneath the paper fills the whole board */
-.art {
+/* one artwork sheet: white paper margin (~2%) + artwork (contain) + soft shadow,
+   filling the board inner frame. 3 layers are reused round-robin. */
+.sheet, .cover {
   position: absolute; inset: 0;
-  background: transparent;
+  border-radius: 3px;
+  transform-origin: var(--grip-x) var(--grip-y);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }
-.artimg {
+.sheet {
+  background: #fbf8f1;
+  padding: 2%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .35), inset 0 0 18px rgba(120, 90, 40, .10);
+}
+.sheetimg {
+  display: block;
   width: 100%; height: 100%;
   object-fit: contain;
-  background: transparent;
-  display: block;
 }
-/* artwork name as a semi-transparent strip over the bottom of the image */
-.art .nm {
+
+/* idle cover sheet: cream paper, intact on all four sides, "等待撕牌" in the middle */
+.cover {
+  z-index: 10;
+  background:
+    repeating-linear-gradient(0deg, #f3ead6, #f3ead6 9px, #e8dcc0 9px, #e8dcc0 18px);
+  color: #9a6b2f;
+  display: flex; align-items: center; justify-content: center;
+  font-size: clamp(12px, 1.6vw, 22px);
+  font-weight: 800; letter-spacing: 3px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .35), inset 0 0 40px rgba(0, 0, 0, .18);
+}
+
+/* paper scraps (small jagged triangles) that burst from the torn edges */
+.shard {
+  position: absolute;
+  left: 0; top: 0;
+  width: 18px; height: 15px;
+  margin: -8px 0 0 -9px;
+  background: #fbf6ea;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .45));
+  clip-path: polygon(0 100%, 45% 0, 100% 70%, 62% 62%);
+  pointer-events: none;
+  z-index: 15;
+}
+
+/* winner name strip: only filled (and faded in) after the winner is revealed */
+.nm {
   position: absolute; left: 0; right: 0; bottom: 0;
+  z-index: 12;
   padding: 6px 10px;
   font-weight: 800;
   font-size: clamp(11px, 1.4vw, 18px);
@@ -62,9 +103,13 @@ body {
   text-align: center;
   background: linear-gradient(0deg, rgba(0,0,0,.72), rgba(0,0,0,0));
   text-shadow: 0 2px 6px #000;
+  border-radius: 0 0 3px 3px;
+  pointer-events: none;
 }
-/* no artwork name until something is drawn (prevents spoiler) */
-.art .nm:empty { display: none; }
+/* no artwork name until the winner is revealed (prevents spoiler) */
+.nm:empty { display: none; }
+.nm.show { animation: nmfade .3s ease-out both; }
+@keyframes nmfade { from { opacity: 0; } to { opacity: 1; } }
 
 /* gold winner badge on the outer top edge of the panel (rides on the frame) */
 .badge {
@@ -83,7 +128,7 @@ body {
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
-  z-index: 5;
+  z-index: 20;
 }
 .panel.won .badge {
   opacity: 1;
@@ -91,48 +136,10 @@ body {
   box-shadow: 0 0 18px 4px rgba(255, 210, 59, .7), 0 4px 14px rgba(0,0,0,.5);
 }
 
-/* cream paper covers — reused layers, intact on all four sides at idle */
-.paper {
-  position: absolute; inset: 0;
-  background:
-    repeating-linear-gradient(0deg, #f3ead6, #f3ead6 9px, #e8dcc0 9px, #e8dcc0 18px);
-  color: #9a6b2f;
-  display: flex; align-items: center; justify-content: center;
-  font-size: clamp(12px, 1.6vw, 22px);
-  font-weight: 800; letter-spacing: 3px;
-  box-shadow: inset 0 0 40px rgba(0, 0, 0, .18);
-  transform-origin: top center;
-  /* default: parked off-screen above, hidden */
-  opacity: 0;
-  transform: translateY(-120%);
-  pointer-events: none;
-}
-/* a paper covering the board: fully intact rectangle */
-.paper.covering {
-  opacity: 1;
-  transform: translateY(0) rotate(0);
-}
-/* a paper being torn off: ragged edge + flung up/rotated + faded */
-.paper.tearing {
-  opacity: 0;
-  transform: translateY(-132%) rotate(-11deg) scale(.92);
-  clip-path: polygon(0 0, 100% 0, 100% 90%, 90% 84%, 80% 95%, 70% 83%, 60% 96%,
-                     50% 84%, 40% 95%, 30% 83%, 20% 94%, 10% 85%, 0 95%);
-}
-
-/* motion only when the user allows it */
+/* motion only when the user allows it (the tear itself is driven from app.js
+   with the Web Animations API and is skipped entirely under reduced motion) */
 @media (prefers-reduced-motion: no-preference) {
-  .paper.covering { animation: dropin .14s ease-out; }
-  .paper.tearing  { animation: tearoff .30s cubic-bezier(.5, -0.3, .7, 1); }
   .panel.won .badge { animation: badgepop .5s cubic-bezier(.3, 1.6, .5, 1); }
-}
-@keyframes dropin {
-  from { opacity: .3; transform: translateY(-55%) rotate(2.5deg); }
-  to   { opacity: 1;  transform: translateY(0) rotate(0); }
-}
-@keyframes tearoff {
-  from { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
-  to   { opacity: 0; transform: translateY(-132%) rotate(-11deg) scale(.92); }
 }
 @keyframes badgepop {
   0%   { transform: translate(-50%, -55%) scale(.6); }
@@ -140,9 +147,11 @@ body {
   100% { transform: translate(-50%, -55%) scale(1); }
 }
 
-/* reduced motion: skip the cycling, just gently fade the result in */
+/* reduced motion: no tearing / no shake — the cover fades out, the winner fades in */
+.cover.fadeout, .sheet.fadeout { opacity: 0; transition: opacity .35s ease; }
+.sheet.fadein-start { opacity: 0; }
+.sheet.fadein { opacity: 1; transition: opacity .35s ease; }
 @media (prefers-reduced-motion: reduce) {
-  .paper { transition: opacity .35s ease; }
   .badge { transition: opacity .35s ease; }
 }
 
@@ -173,11 +182,21 @@ body {
 }
 .btn:hover { filter: brightness(1.07); }
 .btn:active { transform: translateY(2px); }
-.btn:disabled { filter: grayscale(.6) brightness(.8); cursor: not-allowed; }
 .btn.ghost {
   background: transparent; color: #cfe0ff;
   box-shadow: none; border: 1px solid #33467a; margin-left: 12px;
 }
+/* disabled buttons must clearly look disabled (after .ghost so it wins) */
+.btn:disabled,
+.btn.ghost:disabled {
+  opacity: .35;
+  filter: grayscale(1);
+  cursor: not-allowed;
+  box-shadow: none;
+  border-style: dashed;
+}
+.btn:not(.ghost):disabled { border-width: 2px; }
+.btn:disabled:active { transform: none; }
 
 /* mobile: Ultraman image on top (sides cropped), reveal panel as a full-width
    card below it, buttons fixed at an easy-to-reach bottom position. */
@@ -200,6 +219,10 @@ body {
     width: calc(100% - 24px); max-width: 520px; height: auto;
     aspect-ratio: 4 / 3;
     margin: 30px auto 6px;
+    /* hero-mobile.webp: his hand grips the board's top edge at ≈ x81% / y18% of the
+       image, i.e. above the card's top edge at ≈ 82% across → pivot there */
+    --grip-x: 82%;
+    --grip-y: 0%;
   }
   .panel-inner { border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.5), inset 0 0 0 2px rgba(255,210,59,.1); }
   .badge { font-size: clamp(16px, 5.2vw, 24px); }

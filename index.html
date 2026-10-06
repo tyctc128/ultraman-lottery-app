@@ -25,17 +25,23 @@
     <!-- reveal panel positioned over the dark board of hero.webp -->
     <div class="panel idle" id="panel">
       <div class="panel-inner">
-        <!-- the artwork underneath the paper -->
-        <div class="art" id="art">
-          <img class="artimg" id="artimg" alt="">
-          <div class="nm" id="artname"></div>
-        </div>
+        <!-- a stack of artwork sheets (3 reusable layers, round-robin; no DOM per tick).
+             Each draw tick Ultraman grabs the top sheet at the grip corner and tears it off. -->
+        <div class="sheet" id="sheet0" hidden><img class="sheetimg" src="artworks/art1-traffic.jpg" alt=""></div>
+        <div class="sheet" id="sheet1" hidden><img class="sheetimg" src="artworks/art2-star.jpg" alt=""></div>
+        <div class="sheet" id="sheet2" hidden><img class="sheetimg" src="artworks/art3-sweet.jpg" alt=""></div>
 
-        <!-- 2-3 reusable paper layers that tear away one at a time -->
-        <div class="paper covering" id="paper0"><span class="plabel">等待撕牌</span></div>
-        <div class="paper" id="paper1"><span class="plabel">等待撕牌</span></div>
-        <div class="paper" id="paper2"><span class="plabel">等待撕牌</span></div>
+        <!-- idle cover sheet: cream paper, four intact edges; the first tear removes it -->
+        <div class="cover" id="cover"><span class="plabel" id="coverLabel">等待撕牌</span></div>
+
+        <!-- winner name: empty (and hidden) until the winner is revealed -->
+        <div class="nm" id="artname"></div>
       </div>
+
+      <!-- paper scraps that burst from the top / right edges on each rip -->
+      <div class="shard" hidden></div>
+      <div class="shard" hidden></div>
+      <div class="shard" hidden></div>
 
       <!-- gold winner badge, rides on the top edge of the board frame -->
       <div class="badge" id="badge">🏆 中籤！</div>
@@ -45,7 +51,7 @@
   </main>
 
   <div class="controls">
-    <button class="btn" id="startBtn" disabled>載入作品中…</button>
+    <button class="btn" id="startBtn" disabled aria-disabled="true">載入作品中…</button>
     <button class="btn ghost" id="resetBtn">重置</button>
   </div>
 

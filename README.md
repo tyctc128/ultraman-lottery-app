@@ -4,22 +4,34 @@ A fully static children's-artwork lottery website with an Ultraman "tear the pap
 reveal theme. **No backend** — pure HTML / CSS / JS, ready to deploy to **GitHub Pages**.
 
 ## How it works
-- A single reveal panel sits over the dark board in `hero.png`.
+- A reveal panel is aligned over the blackboard inner frame in the Ultraman hero image.
 - The artwork set is **built in** (bundled in `artworks/`), not uploaded by users.
-- Press **開始撕牌抽籤**: the center panel rapidly shuffles through the artworks
-  (~2.6s) with a tearing-paper animation, decelerates, and stops on a
-  **uniformly random** winner, showing it with a gold **🏆 中籤！** badge.
-- Press **重置** to return to the covered / idle state.
+- Press **開始撕牌抽籤**: the board holds a stack of artwork sheets (a cream cover sheet on
+  top while idle). Each tick Ultraman "grabs" the top sheet at the corner his hand holds and
+  tears the whole sheet off toward his body (jagged torn edges, paper scraps, stage shake),
+  revealing the next sheet; the rhythm slows down, pauses with a tense jitter, and a heavy
+  final rip reveals the **uniformly random** winner. Only then does the gold **🏆 中籤！**
+  badge pop and the name fade in (no spoiler while cycling).
+- Press **重置** to put the cover sheet back (disabled — and visibly greyed — while a draw is running).
+- All artworks are preloaded on page load; the start button is disabled until they finish.
 
 The random winner is chosen with `crypto.getRandomValues` (rejection sampling to
 avoid modulo bias), falling back to `Math.random` if unavailable.
 
 ## Files
-- `index.html` — markup
-- `styles.css` — dark sci-fi theme, gold/orange accents, percentage-positioned panel
-- `app.js` — artwork list + tear/shuffle/reveal logic
-- `hero.png` — main Ultraman + board backdrop
-- `artworks/*.svg` — 12 self-contained kid-drawing-style placeholder artworks
+- `index.html` — markup, with a CSP meta and `X-Content-Type-Options: nosniff`
+- `styles.css` — dark sci-fi theme, gold accents, percentage-positioned panel, mobile layout
+- `app.js` — artwork list + tear-off animation (Web Animations API) + draw/reveal logic
+- `hero.webp` — main Ultraman + board backdrop (desktop)
+- `hero-mobile.webp` — Ultraman crop used on narrow screens (≤640px)
+- `artworks/art1-traffic.jpg`, `art2-star.jpg`, `art3-sweet.jpg` — three bundled artworks
+  (anonymized: nickname labels only, no full names / class numbers; EXIF stripped)
+
+## Accessibility & privacy
+- `aria-live` lives on the status line (`.hud`), not the fast-cycling panel.
+- `prefers-reduced-motion`: no tearing or shaking — the cover fades out, the winner fades in.
+- Artwork labels use nicknames only; source images have the handwritten name strip
+  masked and metadata removed.
 
 ## Local preview
 ```bash
@@ -34,5 +46,6 @@ All asset paths are **relative**, so it works under a project subpath like
 `https://<user>.github.io/<repo>/`. GitHub Pages free tier requires a **public** repo.
 
 ## Customizing the artworks
-Replace the `.svg` files in `artworks/` (or add images) and edit the `ARTWORKS`
-array at the top of `app.js` — each entry is `{ src, name }`.
+Replace the image files in `artworks/` (or add images) and edit the `ARTWORKS`
+array at the top of `app.js` — each entry is `{ src, name }`. Keep labels free of
+real names / class numbers before publishing.
