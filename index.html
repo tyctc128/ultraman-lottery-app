@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>奧特曼揭牌抽籤</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>奧特曼揭牌抽籤 <span class="spark">✦</span></h1>
+    <p class="subtitle">奧特曼撕下封紙，抽出今天的幸運之星 ✨</p>
+  </header>
+
+  <main class="wrap">
+    <div class="herowrap">
+      <picture>
+        <source media="(max-width: 640px)" srcset="hero-mobile.webp">
+        <img class="stageimg" src="hero.webp" alt="奧特曼站在黑板旁">
+      </picture>
+    </div>
+
+    <!-- reveal panel positioned over the dark board of hero.webp -->
+    <div class="panel idle" id="panel">
+      <div class="panel-inner">
+        <!-- the artwork underneath the paper -->
+        <div class="art" id="art">
+          <img class="artimg" id="artimg" alt="">
+          <div class="nm" id="artname"></div>
+        </div>
+
+        <!-- 2-3 reusable paper layers that tear away one at a time -->
+        <div class="paper covering" id="paper0"><span class="plabel">等待撕牌</span></div>
+        <div class="paper" id="paper1"><span class="plabel">等待撕牌</span></div>
+        <div class="paper" id="paper2"><span class="plabel">等待撕牌</span></div>
+      </div>
+
+      <!-- gold winner badge, rides on the top edge of the board frame -->
+      <div class="badge" id="badge">🏆 中籤！</div>
+    </div>
+
+    <div class="hud" id="hud" aria-live="polite" role="status">按下按鈕，看奧特曼替你撕牌抽籤！</div>
+  </main>
+
+  <div class="controls">
+    <button class="btn" id="startBtn" disabled>載入作品中…</button>
+    <button class="btn ghost" id="resetBtn">重置</button>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

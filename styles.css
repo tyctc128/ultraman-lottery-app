@@ -1,0 +1,219 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+  background: radial-gradient(circle at 50% 0%, #121a3a 0%, #05060f 60%);
+  color: #fff;
+  min-height: 100vh;
+  padding-bottom: 40px;
+}
+
+.topbar { text-align: center; padding: 26px 16px 10px; }
+.topbar h1 {
+  font-size: clamp(22px, 3.2vw, 40px);
+  letter-spacing: 3px;
+  background: linear-gradient(90deg, #ffd23b, #ff8a3b);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 2px 20px rgba(255, 138, 59, .25);
+}
+.topbar .spark { -webkit-text-fill-color: #ffd23b; }
+.subtitle { margin-top: 8px; color: #aebbe0; font-size: clamp(12px, 1.3vw, 16px); letter-spacing: 1px; }
+
+/* stage: hero image with the reveal panel overlaid */
+.wrap { position: relative; width: 100%; max-width: 1200px; margin: 10px auto 0; }
+.stageimg { display: block; width: 100%; height: auto; border-radius: 10px; }
+
+/* reveal panel aligned to the blackboard inner frame of hero.webp.
+   overflow is visible so the winner badge can ride on the frame;
+   the inner box clips the artwork + paper layers. */
+.panel {
+  position: absolute;
+  left: 37.5%; top: 21.5%;
+  width: 51%; height: 55%;
+}
+.panel-inner {
+  position: absolute; inset: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #1c130a;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .55), inset 0 0 0 2px rgba(255, 210, 59, .08);
+}
+
+/* the artwork underneath the paper fills the whole board */
+.art {
+  position: absolute; inset: 0;
+  background: transparent;
+}
+.artimg {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  background: transparent;
+  display: block;
+}
+/* artwork name as a semi-transparent strip over the bottom of the image */
+.art .nm {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 6px 10px;
+  font-weight: 800;
+  font-size: clamp(11px, 1.4vw, 18px);
+  color: #ffe08a;
+  text-align: center;
+  background: linear-gradient(0deg, rgba(0,0,0,.72), rgba(0,0,0,0));
+  text-shadow: 0 2px 6px #000;
+}
+/* no artwork name until something is drawn (prevents spoiler) */
+.art .nm:empty { display: none; }
+
+/* gold winner badge on the outer top edge of the panel (rides on the frame) */
+.badge {
+  position: absolute;
+  left: 50%; top: 0;
+  transform: translate(-50%, -55%) scale(.8);
+  background: #b00f2a; color: #ffe14d;
+  border: 1px solid #ffe14d;
+  font-weight: 800;
+  font-size: clamp(16px, 2.2vw, 28px);
+  text-shadow: 0 1px 2px rgba(0,0,0,.4);
+  letter-spacing: 2px;
+  padding: 6px 22px;
+  border-radius: 24px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .5);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+.panel.won .badge {
+  opacity: 1;
+  transform: translate(-50%, -55%) scale(1);
+  box-shadow: 0 0 18px 4px rgba(255, 210, 59, .7), 0 4px 14px rgba(0,0,0,.5);
+}
+
+/* cream paper covers — reused layers, intact on all four sides at idle */
+.paper {
+  position: absolute; inset: 0;
+  background:
+    repeating-linear-gradient(0deg, #f3ead6, #f3ead6 9px, #e8dcc0 9px, #e8dcc0 18px);
+  color: #9a6b2f;
+  display: flex; align-items: center; justify-content: center;
+  font-size: clamp(12px, 1.6vw, 22px);
+  font-weight: 800; letter-spacing: 3px;
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, .18);
+  transform-origin: top center;
+  /* default: parked off-screen above, hidden */
+  opacity: 0;
+  transform: translateY(-120%);
+  pointer-events: none;
+}
+/* a paper covering the board: fully intact rectangle */
+.paper.covering {
+  opacity: 1;
+  transform: translateY(0) rotate(0);
+}
+/* a paper being torn off: ragged edge + flung up/rotated + faded */
+.paper.tearing {
+  opacity: 0;
+  transform: translateY(-132%) rotate(-11deg) scale(.92);
+  clip-path: polygon(0 0, 100% 0, 100% 90%, 90% 84%, 80% 95%, 70% 83%, 60% 96%,
+                     50% 84%, 40% 95%, 30% 83%, 20% 94%, 10% 85%, 0 95%);
+}
+
+/* motion only when the user allows it */
+@media (prefers-reduced-motion: no-preference) {
+  .paper.covering { animation: dropin .14s ease-out; }
+  .paper.tearing  { animation: tearoff .30s cubic-bezier(.5, -0.3, .7, 1); }
+  .panel.won .badge { animation: badgepop .5s cubic-bezier(.3, 1.6, .5, 1); }
+}
+@keyframes dropin {
+  from { opacity: .3; transform: translateY(-55%) rotate(2.5deg); }
+  to   { opacity: 1;  transform: translateY(0) rotate(0); }
+}
+@keyframes tearoff {
+  from { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
+  to   { opacity: 0; transform: translateY(-132%) rotate(-11deg) scale(.92); }
+}
+@keyframes badgepop {
+  0%   { transform: translate(-50%, -55%) scale(.6); }
+  60%  { transform: translate(-50%, -55%) scale(1.18); }
+  100% { transform: translate(-50%, -55%) scale(1); }
+}
+
+/* reduced motion: skip the cycling, just gently fade the result in */
+@media (prefers-reduced-motion: reduce) {
+  .paper { transition: opacity .35s ease; }
+  .badge { transition: opacity .35s ease; }
+}
+
+/* HUD line under the stage (also the aria-live region) */
+.hud {
+  position: absolute;
+  left: 50%; top: 90%; transform: translateX(-50%);
+  width: 70%;
+  text-align: center;
+  color: #ffe08a;
+  font-size: clamp(11px, 1.3vw, 18px);
+  text-shadow: 0 2px 6px #000, 0 0 10px rgba(0,0,0,.8);
+  font-weight: 800; letter-spacing: 1px;
+}
+
+/* controls */
+.controls { text-align: center; margin: 24px auto 10px; padding: 0 16px; }
+.btn {
+  font-size: clamp(14px, 1.3vw, 18px);
+  letter-spacing: 3px;
+  color: #0a1024; font-weight: 800;
+  border: none; cursor: pointer;
+  padding: 15px 46px;
+  border-radius: 40px;
+  background: linear-gradient(90deg, #ffd23b, #ff8a3b);
+  box-shadow: 0 10px 30px rgba(255, 138, 59, .45);
+  transition: transform .12s ease, filter .12s ease;
+}
+.btn:hover { filter: brightness(1.07); }
+.btn:active { transform: translateY(2px); }
+.btn:disabled { filter: grayscale(.6) brightness(.8); cursor: not-allowed; }
+.btn.ghost {
+  background: transparent; color: #cfe0ff;
+  box-shadow: none; border: 1px solid #33467a; margin-left: 12px;
+}
+
+/* mobile: Ultraman image on top (sides cropped), reveal panel as a full-width
+   card below it, buttons fixed at an easy-to-reach bottom position. */
+@media (max-width: 640px) {
+  body { padding-bottom: 96px; }
+  .wrap { max-width: 100%; }
+  .herowrap {
+    height: 38vh;
+    overflow: hidden;
+    border-radius: 0 0 10px 10px;
+  }
+  .stageimg {
+    width: 100%; height: auto;
+    display: block;
+    margin-top: -5%;
+  }
+  .panel {
+    position: relative;
+    left: auto; top: auto;
+    width: calc(100% - 24px); max-width: 520px; height: auto;
+    aspect-ratio: 4 / 3;
+    margin: 30px auto 6px;
+  }
+  .panel-inner { border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.5), inset 0 0 0 2px rgba(255,210,59,.1); }
+  .badge { font-size: clamp(16px, 5.2vw, 24px); }
+  .hud {
+    position: static;
+    left: auto; top: auto; transform: none;
+    width: auto;
+    margin: 8px 14px 4px;
+  }
+  .controls {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    margin: 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(0deg, rgba(5,6,15,.96) 60%, rgba(5,6,15,0));
+    z-index: 50;
+  }
+  .controls .btn { padding: 13px 30px; }
+}
