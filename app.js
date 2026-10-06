@@ -311,7 +311,7 @@ function tearSheet(el, d, heavy) {
 function captionFor(i) {
   const r = roster[i];
   if (!r) return ARTWORKS[i].name;                     // no list on this computer → nickname
-  return kingdomOf(i) + " · " + r.seat + " " + r.name;  // e.g. 交通王國 · 座號 名字
+  return r.seat + " " + r.name;                   // e.g. 座號 名字 (no kingdom prefix — Simon's format)
 }
 function refreshZoomCaption() {
   if (!zoomEl.hidden && winnerIdx >= 0) zoomCap.textContent = captionFor(winnerIdx);
@@ -513,7 +513,16 @@ document.getElementById("rosterSave").addEventListener("click", saveRoster);
 rosterClearBtn.addEventListener("click", clearRoster);
 rosterReveal.addEventListener("click", () => { setRevealed(!revealed); });
 document.getElementById("rosterClose").addEventListener("click", closeRoster);
-rosterEl.addEventListener("click", e => { if (e.target === rosterEl) closeRoster(); });
+// backdrop closes only when the press AND the release are both on the backdrop
+// (dragging a text selection out of the textarea must not close the dialog and lose the paste)
+let backdropDown = false;
+rosterEl.addEventListener("pointerdown", e => { backdropDown = e.target === rosterEl; });
+rosterEl.addEventListener("pointerup", e => {
+  const ok = backdropDown && e.target === rosterEl;
+  backdropDown = false;
+  if (ok) closeRoster();
+});
+rosterEl.addEventListener("pointercancel", () => { backdropDown = false; });
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeRoster(); });
 window.addEventListener("storage", e => {         // another tab saved / cleared the list
   if (e.key !== ROSTER_KEY && e.key !== null) return;
