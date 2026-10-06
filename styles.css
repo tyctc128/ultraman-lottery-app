@@ -28,20 +28,28 @@ body {
 .wrap { position: relative; width: 100%; max-width: 1200px; margin: 10px auto 0; overflow: hidden; }
 .stageimg { display: block; width: 100%; height: auto; border-radius: 10px; }
 
-/* v5: Ultraman's lower hand (chest height, reaching to the board), overlaid on hero-nohand-lower.webp at the exact spot it was cut from.
-   % of the hero image, so it scales with it. Pivot = wrist / thumb root (the arm is hidden
-   behind the board frame). z-order: hero < torn paper (≤15) < hand. */
+/* v6: Ultraman's whole reaching arm, overlaid on hero-noarm.webp exactly where it was cut out.
+   .arm = bounding box of both parts (source px 72,212, 432×294 of the 1536×1024 hero), rotates at
+   the shoulder; .fore (forearm + cuff + hand) sits on top of .upper and rotates at the elbow.
+   % of the hero image, so it scales with it. z-order: hero < torn paper (≤15) < arm (25). */
 .herowrap { position: relative; }
-.hand {
+.arm {
   position: absolute;
-  left: 20.96%; top: 41.70%; width: 11.78%; height: auto;
-  transform-origin: 16.6% 54.5%;       /* v5: wrist = where the cuff meets the palm (cuff stays in the background) */
+  left: 4.6875%; top: 20.7031%; width: 28.125%; aspect-ratio: 432 / 294;
+  transform-origin: 12.27% 12.93%;     /* shoulder joint (125,250) */
   z-index: 25;
   pointer-events: none;
   will-change: transform;
 }
+.arm img { position: absolute; display: block; height: auto; }
+.arm .upper { left: 0; top: 0; width: 30.556%; }
+.arm .fore {
+  left: 14.120%; top: 57.143%; width: 85.880%;
+  transform-origin: 5.93% 38.10%;      /* elbow (155,428), in % of forearm.webp itself */
+  will-change: transform;
+}
 
-/* reveal panel aligned to the blackboard inner frame of hero-nohand-lower.webp.
+/* reveal panel aligned to the blackboard inner frame of hero-noarm.webp.
    --grip-x / --grip-y = where Ultraman's hand grips the top sheet (the tear pivot),
    in % of the panel. Desktop (v5): his lower hand's fingertips touch the middle of the sheet's left edge → pivot 0% 48%. */
 .panel {
@@ -211,14 +219,14 @@ body {
 .btn:not(.ghost):disabled { border-width: 2px; }
 .btn:disabled:active { transform: none; }
 
-/* mobile (v5): hero-mobile-nohand-lower.webp is a 600×540 crop (face + reaching lower hand) of his upper body; the hand gripping
+/* mobile (v6): hero-mobile-noarm.webp is a 600×540 crop (face + reaching lower hand) of his upper body; the hand gripping
    the board corner sits at the bottom-right of the image. The reveal card is laid
    directly under the image so its top-right corner is right at his hand, and the tear
    pivots under his fingertips (top edge ≈ 86%) and flings down-left toward his body. Buttons are sticky:
    right under the card, pinned to the bottom only when the page is long. */
 @media (max-width: 640px) {
   body { padding-bottom: 12px; }
-  .hand { left: 53.67%; top: 79.07%; width: 30.17%; }
+  .arm { left: 12%; top: 39.259%; width: 72%; }   /* v6: same 600×540 crop (no scaling); inner % unchanged */
   .wrap { max-width: 100%; }
   .herowrap {
     height: auto;

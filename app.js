@@ -1,5 +1,5 @@
 // 奧特曼揭牌抽籤 — 純前端靜態網站（GitHub Pages 友善，相對路徑）
-// 撕牌動作 v5：奧特曼站在黑板左邊，用胸口高度伸向黑板的那隻手（去背疊圖、手腕為軸）跟著每一撕「捏→上抬→下擺→彈回」；
+// 撕牌動作 v6：奧特曼站在黑板左邊，胸口那整隻手臂（去背疊圖，肩為主軸、肘為次軸）跟著每一撕「捏→上抬→下擺→彈回」；
 // 上方扶黑板的手不動。畫面是一疊作品紙，每一抽他捏住紙緣（支點：桌機左緣中段、手機卡片上緣 86%）
 // 把最上面那整張作品往他身體方向（左下）扯下、甩出畫面，露出下一張；最後留下的就是中籤作品。
 
@@ -20,7 +20,8 @@ const startBtn   = document.getElementById("startBtn");
 const resetBtn   = document.getElementById("resetBtn");
 const sheets     = Array.from(document.querySelectorAll(".sheet"));   // 3 reusable layers
 const shards     = Array.from(document.querySelectorAll(".shard"));   // 3 reusable scraps
-const handEl     = document.getElementById("hand");                     // v3 cut-out hand overlay
+const armEl      = document.getElementById("arm");                      // v6: whole arm, rotates at the shoulder
+const foreEl     = document.getElementById("fore");                     // v6: forearm + hand, rotates at the elbow
 const controlsEl = document.querySelector(".controls");
 const zoomEl     = document.getElementById("zoom");                     // winner lightbox
 const zoomImg    = document.getElementById("zoomImg");
@@ -198,51 +199,53 @@ function burst(count) {
   }
 }
 
-// ── v5: the LOWER hand (chest height, reaching to the board; pivot = wrist) ──
-// The upper hand holding the board stays in the background. This one swings around the wrist,
-// with the same d / offsets as tearSheet: pinch → lift (−16°, final −20°) → yank down hard
-// (+28°, final +35°) while the hand also drops 6% of its width (final 8%) → spring back (−5°).
-// Fingers point right, wrist on the left: rotate > 0 = fingers down, < 0 = fingers up.
-// translate % is relative to the hand box (181×78): 6% of its width ≈ 14% of its height, 8% ≈ 19%.
-// (Kept small so the background cuff doesn't read as a second, doubled cuff at the low point.)
-const H = (x, y, r) => `translate(${x}, ${y}) rotate(${r}deg)`;
-const HAND_TENSE = { y: -6, r: -12 };             // pre-final pause: lifted, holding the paper taut
-const HAND_DROP = { normal: 14, heavy: 19 };      // % of hand height ≈ 6% / 8% of hand width
-function stopHand() {
-  if (!handEl) return;
-  cancelAnims(handEl);
-  if (handEl.getAnimations) handEl.getAnimations().forEach(a => { try { a.cancel(); } catch (e) {} });
+// ── v6: the WHOLE reaching arm (shoulder = main pivot, elbow = second pivot) ──
+// .arm rotates at the shoulder; .fore (forearm + hand) rotates at the elbow inside it, so the
+// elbow bend rides on the shoulder swing. Same d / offsets as tearSheet:
+// pinch → lift (shoulder −6 / elbow −12, final −8 / −15) → yank down hard (+8 / +18, final +10 / +22)
+// → stay low with the paper → spring back (−2 / −4). rotate > 0 = hand down, < 0 = hand up.
+// At rest the fingertips are where v5's were, so --grip-* and the paper's flight are unchanged.
+const R = r => `rotate(${r}deg)`;
+const ARM_TENSE = { s: -3, e: -8 };               // pre-final pause: arm lifted, holding the paper taut
+const ARM_KEYS = {                                // [offset, shoulder, elbow] normal / final
+  normal: [[0, 0, 0], [0.05, 1, 2], [0.10, -6, -12], [0.15, 0, 0], [0.25, 8, 18], [0.62, 6, 13], [0.80, -2, -4], [1, 0, 0]],
+  heavy:  [[0, ARM_TENSE.s, ARM_TENSE.e], [0.05, 1, 2], [0.10, -8, -15], [0.15, 0, 0], [0.25, 10, 22], [0.62, 7, 16], [0.80, -2, -4], [1, 0, 0]],
+};
+const ARM_EASE = { 0.10: "cubic-bezier(.3,0,.2,1)", 0.15: "cubic-bezier(.5,0,.2,1.15)", 0.25: "ease-out" };
+function stopArm() {
+  [armEl, foreEl].forEach(el => {
+    if (!el) return;
+    cancelAnims(el);
+    if (el.getAnimations) el.getAnimations().forEach(a => { try { a.cancel(); } catch (e) {} });
+  });
 }
-function handSwing(d, heavy) {
-  if (!handEl || reduceMotion()) return;
-  const k = heavy ? 1.25 : 1;
-  const drop = heavy ? HAND_DROP.heavy : HAND_DROP.normal;
-  cancelAnims(handEl);
-  const start = heavy ? H("0%", `${HAND_TENSE.y}%`, HAND_TENSE.r) : H("0%", "0%", 0);
-  animate(handEl, [
-    { offset: 0,    transform: start },
-    { offset: 0.05, transform: H("0%", "3%", 3) },                                           // pinch the edge
-    { offset: 0.10, transform: H("0%", `${-8 * k}%`, -16 * k), easing: "cubic-bezier(.3,0,.2,1)" }, // lift it
-    { offset: 0.15, transform: H("0%", "0%", 0), easing: "cubic-bezier(.5,0,.2,1.15)" },     // start down: hard yank, slight overshoot
-    { offset: 0.25, transform: H("-3%", `${drop}%`, 28 * k), easing: "ease-out" },            // yank down + drop
-    { offset: 0.62, transform: H("-2%", `${Math.round(drop * 0.7)}%`, 20 * k) },              // stays low with the paper
-    { offset: 0.80, transform: H("0%", "-3%", -5) },                                         // spring back, overshoot up
-    { offset: 1,    transform: H("0%", "0%", 0) },
-  ], { duration: d, fill: "none" });
+function armSwing(d, heavy) {
+  if (!armEl || !foreEl || reduceMotion()) return;
+  cancelAnims(armEl); cancelAnims(foreEl);
+  const keys = heavy ? ARM_KEYS.heavy : ARM_KEYS.normal;
+  const frames = col => keys.map(k => {
+    const f = { offset: k[0], transform: R(k[col]) };
+    if (ARM_EASE[k[0]]) f.easing = ARM_EASE[k[0]];
+    return f;
+  });
+  animate(armEl,  frames(1), { duration: d, fill: "none" });   // shoulder
+  animate(foreEl, frames(2), { duration: d, fill: "none" });   // elbow
 }
-// pre-final pause: lift and hold the paper taut, with a ±1.5° tremble
-function handTense(ms) {
-  if (!handEl || reduceMotion()) return;
-  cancelAnims(handEl);
-  const y = HAND_TENSE.y, r = HAND_TENSE.r;
-  animate(handEl, [
-    { transform: H("0%", "0%", 0) },
-    { transform: H("0%", `${y}%`, r), offset: 0.3, easing: "ease-out" },
-    { transform: H("0%", `${y}%`, r + 1.5), offset: 0.45 },
-    { transform: H("0%", `${y}%`, r - 1.5), offset: 0.6 },
-    { transform: H("0%", `${y}%`, r + 1.5), offset: 0.75 },
-    { transform: H("0%", `${y}%`, r - 1.5), offset: 0.9 },
-    { transform: H("0%", `${y}%`, r) },
+// pre-final pause: lift the arm and hold the paper taut; the elbow trembles ±1.5°
+function armTense(ms) {
+  if (!armEl || !foreEl || reduceMotion()) return;
+  cancelAnims(armEl); cancelAnims(foreEl);
+  const s0 = ARM_TENSE.s, e = ARM_TENSE.e;
+  animate(armEl, [{ transform: R(0) }, { transform: R(s0), offset: 0.3, easing: "ease-out" }, { transform: R(s0) }],
+    { duration: ms, fill: "forwards" });
+  animate(foreEl, [
+    { transform: R(0) },
+    { transform: R(e), offset: 0.3, easing: "ease-out" },
+    { transform: R(e + 1.5), offset: 0.45 },
+    { transform: R(e - 1.5), offset: 0.6 },
+    { transform: R(e + 1.5), offset: 0.75 },
+    { transform: R(e - 1.5), offset: 0.9 },
+    { transform: R(e) },
   ], { duration: ms, fill: "forwards" });
 }
 
@@ -272,7 +275,7 @@ const RIP_EASE  = "cubic-bezier(.2,.9,.3,1)";    // 15→25%: the snap of the ri
 const PULL_EASE = "cubic-bezier(.5,0,.9,.6)";    // 25→62%: slow → fast, like being yanked away
 const FLING_EASE = "cubic-bezier(.3,.45,.75,1)"; // 62→100%: carries the speed off the stage
 function tearSheet(el, d, heavy) {
-  handSwing(d, heavy);                           // the right hand swings in sync (same d, same offsets)
+  armSwing(d, heavy);                            // v6: the whole arm swings in sync (same d, same offsets)
   const grip = heavy
     ? [{ offset: 0, transform: TENSE_END },
        { offset: 0.08, transform: T("2px", "5px", -2, -2.5, 1) },
@@ -557,7 +560,7 @@ function toIdle() {
   spinning = false;
   clearTimers();
   cancelAnims();
-  stopHand();                                  // 重置：手的動畫全部取消，回到原位不殘留角度
+  stopArm();                                   // 重置：肩、肘兩層動畫全部取消，回到原位不殘留角度
   closeZoom();
   setZoomable(false);
   panel.classList.remove("spinning", "won");
@@ -663,7 +666,7 @@ function startDraw() {
     } else {
       // 最後一撕前停頓：紙角抖動加劇，然後重重一扯
       tense(el, PAUSE_MS);
-      handTense(PAUSE_MS);
+      armTense(PAUSE_MS);
       later(() => {
         tearSheet(el, FINAL_D, true);
         later(() => {
@@ -681,7 +684,7 @@ function startDraw() {
 function finishDraw(winner, winEl) {
   clearTimers();
   cancelAnims();
-  stopHand();
+  stopArm();
   sheets.forEach(s => { if (s !== winEl) { restSheet(s); s.hidden = true; } });
   restSheet(winEl);
   winEl.hidden = false;

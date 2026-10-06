@@ -22,9 +22,9 @@ avoid modulo bias), falling back to `Math.random` if unavailable.
 - `index.html` — markup, with a CSP meta and `X-Content-Type-Options: nosniff`
 - `styles.css` — dark sci-fi theme, gold accents, percentage-positioned panel, mobile layout
 - `app.js` — artwork list + tear-off animation (Web Animations API) + draw/reveal logic
-- `hero-nohand-lower.webp` — main backdrop (desktop): Ultraman left of the board, with his lower (reaching) hand removed; the upper hand holding the board stays in the picture
-- `hero-mobile-nohand-lower.webp` — 600×540 crop for narrow screens (≤640px): face + reaching arm, hand removed
-- `lower-hand.webp` — cut-out lower hand overlaid on the backdrop; on every tear it lifts (−16°, final −20°) → yanks down (+28°, final +35°, dropping 6% of its width, final 8%) → springs back (−5°) around the wrist, in sync with the paper, which is pulled from the middle of its left edge and flung down-left. Static under `prefers-reduced-motion`.
+- `hero-noarm.webp` — main backdrop (desktop, 1536×1024): Ultraman left of the board, with his whole reaching arm (shoulder to fingertips) removed and the body/sky filled in; the upper hand holding the board stays in the picture
+- `hero-mobile-noarm.webp` — 600×540 crop of the same backdrop for narrow screens (≤640px)
+- `upper-arm.webp` + `forearm.webp` — the cut-out arm in two nested layers (shared by desktop and mobile): `.arm` rotates at the shoulder, `.fore` (forearm + hand) at the elbow. On every tear: lift (shoulder −6° / elbow −12°, final −8° / −15°) → yank down (+8° / +18°, final +10° / +22°) → spring back (−2° / −4°), in sync with the paper, which is pulled from the middle of its left edge and flung down-left. Static under `prefers-reduced-motion`.
 - Click the winning artwork to view it full-screen (click / Esc to close).
 - `artworks/art1-traffic.jpg`, `art2-star.jpg`, `art3-sweet.jpg` — three bundled artworks
   (anonymized: nickname labels only, no full names / class numbers; EXIF stripped)
