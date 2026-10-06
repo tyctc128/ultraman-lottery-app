@@ -22,9 +22,9 @@ avoid modulo bias), falling back to `Math.random` if unavailable.
 - `index.html` — markup, with a CSP meta and `X-Content-Type-Options: nosniff`
 - `styles.css` — dark sci-fi theme, gold accents, percentage-positioned panel, mobile layout
 - `app.js` — artwork list + tear-off animation (Web Animations API) + draw/reveal logic
-- `hero-nohand-right.webp` — main backdrop (desktop), mirrored so Ultraman stands to the right of the board, gripping hand removed
-- `hero-mobile-nohand-right.webp` — Ultraman crop used on narrow screens (≤640px), mirrored, hand removed
-- `right-hand.webp` — cut-out right hand overlaid on the backdrop; on every tear it lifts (+9°, final +11°) → swings down (−16°, final −20°) → springs back (+3°) around the wrist, in sync with the paper, which is flung down-right. Static under `prefers-reduced-motion`.
+- `hero-nohand-lower.webp` — main backdrop (desktop): Ultraman left of the board, with his lower (reaching) hand removed; the upper hand holding the board stays in the picture
+- `hero-mobile-nohand-lower.webp` — 600×540 crop for narrow screens (≤640px): face + reaching arm, hand removed
+- `lower-hand.webp` — cut-out lower hand overlaid on the backdrop; on every tear it lifts (−8°, final −10°) → swings down (+14°, final +17.5°) → springs back (−3°) around the wrist, in sync with the paper, which is pulled from the middle of its left edge and flung down-left. Static under `prefers-reduced-motion`.
 - Click the winning artwork to view it full-screen (click / Esc to close).
 - `artworks/art1-traffic.jpg`, `art2-star.jpg`, `art3-sweet.jpg` — three bundled artworks
   (anonymized: nickname labels only, no full names / class numbers; EXIF stripped)

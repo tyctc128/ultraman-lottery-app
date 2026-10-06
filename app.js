@@ -1,6 +1,7 @@
 // 奧特曼揭牌抽籤 — 純前端靜態網站（GitHub Pages 友善，相對路徑）
-// 撕牌動作 v4：奧特曼站在黑板右邊，用右手（去背疊圖、手腕為軸）跟著每一撕「抓→上抬→下擺→彈回」；畫面是一疊作品紙，每一抽奧特曼抓住紙角（支點 = 他的手；桌機右上、手機左上 15%）
-// 把最上面那整張作品往他身體方向（右下）扯下、甩出畫面，露出下一張；最後留下的就是中籤作品。
+// 撕牌動作 v5：奧特曼站在黑板左邊，用胸口高度伸向黑板的那隻手（去背疊圖、手腕為軸）跟著每一撕「捏→上抬→下擺→彈回」；
+// 上方扶黑板的手不動。畫面是一疊作品紙，每一抽他捏住紙緣（支點：桌機左緣中段、手機卡片上緣 86%）
+// 把最上面那整張作品往他身體方向（左下）扯下、甩出畫面，露出下一張；最後留下的就是中籤作品。
 
 // 內建作品清單：檔名以相對路徑引用，確保在 /reponame/ 子路徑下也能載入
 const ARTWORKS = [
@@ -145,18 +146,18 @@ function edgePoly(amp) {
   pts.push(amp ? `${(100 - ax).toFixed(2)}% ${(amp * 0.9).toFixed(2)}%` : "100% 0%");
   for (let j = 1; j < M; j++) pts.push(`${(100 - jag(ax, j % 2)).toFixed(2)}% ${(j / M * 100).toFixed(2)}%`);
   pts.push(`${(100 - (amp ? ax * 0.3 : 0)).toFixed(2)}% 100%`, "0% 100%");
-  // v4 mirror: torn edges are the top + LEFT (x → 100 − x), same vertex count so it still morphs
-  const mirrored = pts.map(pt => { const [px, py] = pt.split(" "); return `${(100 - parseFloat(px)).toFixed(2)}% ${py}`; });
-  return `polygon(${mirrored.join(", ")})`;
+  // torn edges = top + right (MX = -1 would mirror them to top + left; same vertex count either way)
+  const out = MX === 1 ? pts : pts.map(pt => { const [px, py] = pt.split(" "); return `${(100 - parseFloat(px)).toFixed(2)}% ${py}`; });
+  return `polygon(${out.join(", ")})`;
 }
 
-// v4: the hero is mirrored (Ultraman on the RIGHT, tearing with his right hand), so every
-// horizontal move / rotation / skew of the paper is mirrored: MX flips x, rotate and skewX.
-const MX = -1;
+// v5: back to the original (un-mirrored) hero — Ultraman on the LEFT, paper flung down-left
+// (v2.1 keyframes). MX = 1 keeps every value as written; MX = -1 would mirror x / rotate / skewX.
+const MX = 1;
 const flipX = x => (typeof x === "number" ? x * MX
   : (x.startsWith("-") ? x.slice(1) : (parseFloat(x) === 0 ? x : "-" + x)));
 const T = (x, y, r, s, k) => `translate(${flipX(x)}, ${y}) rotate(${r * MX}deg) skewX(${s * MX}deg) scale(${k})`;
-const TENSE_END = T("-3px", "4px", -1.5, -2, 1);   // pose at the end of the pre-final pause (pulled toward his hand, barely rotated; mirrored by T for v4)
+const TENSE_END = T("-3px", "4px", -1.5, -2, 1);   // pose at the end of the pre-final pause (pulled toward his hand, barely rotated)
 
 // the stage shakes once at the moment of the rip
 function shake(heavy) {
@@ -174,25 +175,27 @@ function shake(heavy) {
 function burst(count) {
   for (let i = 0; i < count && i < shards.length; i++) {
     const sh = shards[i];
-    if (i % 2 === 0) { sh.style.left = (10 + Math.random() * 55).toFixed(1) + "%"; sh.style.top = "0%"; }
-    else             { sh.style.left = "0%"; sh.style.top = (8 + Math.random() * 50).toFixed(1) + "%"; }   // v4: left edge
+    if (i % 2 === 0) { sh.style.left = (35 + Math.random() * 55).toFixed(1) + "%"; sh.style.top = "0%"; }
+    else             { sh.style.left = "100%"; sh.style.top = (8 + Math.random() * 50).toFixed(1) + "%"; }
     sh.hidden = false;
     const rot = (Math.random() < 0.5 ? -1 : 1) * (90 + Math.random() * 120);
     cancelAnims(sh);
     animate(sh, [
       { transform: "translate(0px,0px) rotate(0deg)", opacity: 1 },
-      { transform: `translate(-20px,-20px) rotate(${rot.toFixed(0)}deg)`, opacity: 0 },
+      { transform: `translate(20px,-20px) rotate(${rot.toFixed(0)}deg)`, opacity: 0 },
     ], { duration: 250, easing: "ease-out", fill: "forwards" });
     later(() => { sh.hidden = true; cancelAnims(sh); }, 260);
   }
 }
 
-// ── v4: the RIGHT hand (cut-out overlay, pivot = wrist at its bottom-right) ──
-// Swings up and down around the wrist, driven with the same d / offsets as tearSheet:
-// grip → lift (+9°, final +11°) → swing down hard (−16°, final −20°) as the paper rips → spring back (+3°).
-// rotate > 0 = fingers up, < 0 = fingers down. Translation stays within ~10% of the hand.
+// ── v5: the LOWER hand (chest height, reaching to the board; pivot = wrist) ──
+// The upper hand holding the board stays in the background. This one swings around the wrist,
+// with the same d / offsets as tearSheet: pinch → lift (−8°, final −10°) → swing down hard
+// (+14°, final +17.5°) as the paper rips → spring back (−3°).
+// Fingers point right, wrist on the left: rotate > 0 = fingers down, < 0 = fingers up.
+// Translation stays within ~3% of the hand so it never separates from the cuff in the background.
 const H = (x, y, r) => `translate(${x}, ${y}) rotate(${r}deg)`;
-const HAND_TENSE = { y: -6, r: 7 };               // pre-final pause: hand lifted, pulling the paper taut
+const HAND_TENSE = { y: -3, r: -6 };              // pre-final pause: lifted, holding the paper taut
 function stopHand() {
   if (!handEl) return;
   cancelAnims(handEl);
@@ -205,12 +208,12 @@ function handSwing(d, heavy) {
   const start = heavy ? H("0%", `${HAND_TENSE.y}%`, HAND_TENSE.r) : H("0%", "0%", 0);
   animate(handEl, [
     { offset: 0,    transform: start },
-    { offset: 0.05, transform: H("0%", "3%", -3) },                                         // grip, press down
-    { offset: 0.10, transform: H("0%", `${-8 * k}%`, 9 * k), easing: "cubic-bezier(.3,0,.2,1)" }, // lift the corner
-    { offset: 0.15, transform: H("0%", "0%", 2) },                                          // start down
-    { offset: 0.25, transform: H(`${-3 * k}%`, `${10 * k}%`, -16 * k), easing: "ease-out" },  // swing down hard (paper rips)
-    { offset: 0.62, transform: H("-2%", "7%", -11 * k) },                                   // stays low with the paper
-    { offset: 0.80, transform: H("0%", "-2%", 3) },                                         // spring back, slight overshoot
+    { offset: 0.05, transform: H("0%", "2%", 2) },                                          // pinch the edge
+    { offset: 0.10, transform: H("0%", `${-4 * k}%`, -8 * k), easing: "cubic-bezier(.3,0,.2,1)" }, // lift it
+    { offset: 0.15, transform: H("0%", "0%", 0) },                                          // start down
+    { offset: 0.25, transform: H("-3%", `${6 * k}%`, 14 * k), easing: "ease-out" },          // yank down toward his body
+    { offset: 0.62, transform: H("-2%", "4%", 10 * k) },                                    // stays low with the paper
+    { offset: 0.80, transform: H("0%", "-1%", -3) },                                        // spring back, slight overshoot
     { offset: 1,    transform: H("0%", "0%", 0) },
   ], { duration: d, fill: "none" });
 }
@@ -231,7 +234,7 @@ function handTense(ms) {
 }
 
 // pre-final pause: the gripped corner jitters harder and harder (tension).
-// v3: the jitter is mostly translation toward his hand (v4: down-right, via T's mirror) with very little
+// v3: the jitter is mostly translation toward his hand (down-left) with very little
 // rotation, so the far (right) edge never lifts above the board while it tautens.
 function tense(el, ms) {
   animate(el, [
@@ -248,7 +251,7 @@ function tense(el, ms) {
 
 // one tear of the top sheet over duration d (pivot = grip corner via CSS transform-origin):
 //  0–15% grip (paper tautens + 2px jitter, almost no rotation) · 15–25% rip open (+ stage shake)
-//  25–100% pulled DOWN-RIGHT (v4 mirror; values below are written for the v3 left side and flipped by T) toward his hand/body and out past his feet (translation leads,
+//  25–100% pulled DOWN-LEFT toward his hand/body and out past his feet (translation leads,
 //  rotation follows), fading out over the last 20%
 //  from 15% the top + right edges turn jagged · at 25% scraps burst from those edges
 // v3 trajectory (UI/UX spec): 25% ≈ translate(-10%, 6%) rotate(-6deg) → 100% ≈ translate(-90%, 70%) rotate(-25deg)
