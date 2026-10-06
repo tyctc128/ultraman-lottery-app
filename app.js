@@ -25,6 +25,14 @@ const controlsEl = document.querySelector(".controls");
 const zoomEl     = document.getElementById("zoom");                     // winner lightbox
 const zoomImg    = document.getElementById("zoomImg");
 const zoomCap    = document.getElementById("zoomCap");
+const rosterBtn    = document.getElementById("rosterBtn");                // 📋 名單 (local class list)
+const rosterEl     = document.getElementById("roster");
+const rosterText   = document.getElementById("rosterText");
+const rosterStatus = document.getElementById("rosterStatus");
+const rosterSaved  = document.getElementById("rosterSaved");                // "已存 N 筆" (contents hidden by default)
+const rosterSavedText = document.getElementById("rosterSavedText");
+const rosterReveal = document.getElementById("rosterReveal");
+const rosterClearBtn = document.getElementById("rosterClear");
 
 const reduceMQ = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
 const reduceMotion = () => !!(reduceMQ && reduceMQ.matches);
@@ -301,7 +309,12 @@ function tearSheet(el, d, heavy) {
 // The caption comes from captionFor() — the single hook for showing a different label later
 // (e.g. a class list kept only on the teacher's own computer). Never written to the repo.
 function captionFor(i) {
-  return ARTWORKS[i].name;
+  const r = roster[i];
+  if (!r) return ARTWORKS[i].name;                     // no list on this computer → nickname
+  return kingdomOf(i) + " · " + r.seat + " " + r.name;  // e.g. 交通王國 · 座號 名字
+}
+function refreshZoomCaption() {
+  if (!zoomEl.hidden && winnerIdx >= 0) zoomCap.textContent = captionFor(winnerIdx);
 }
 function openZoom() {
   if (spinning || !winnerSheet || winnerIdx < 0 || !panel.classList.contains("won")) return;
@@ -336,6 +349,179 @@ panel.addEventListener("keydown", e => {
 });
 zoomEl.addEventListener("click", closeZoom);
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeZoom(); });
+
+// ── 📋 local class list: seat number + name per artwork ─────────────────
+// Privacy rules (Security): paste only (never read from the URL), stored ONLY in this browser's
+// localStorage, never sent anywhere, never logged, always rendered with textContent, bounded
+// size, and 「清除名單」 really removes the stored item. Nothing here is ever written to the repo.
+// Each line names its artwork explicitly (作品編號 1–3 or 王國名稱) — never by line order:
+//   作品1 00000 範例      1 00000 範例      交通王國 00000 範例
+const ROSTER_KEY = "ultraman-lottery.roster.v1";
+const ROSTER_MAX_CHARS = 2000, ROSTER_MAX_LINES = 50, ROSTER_MAX_LINE = 80, NAME_MAX = 12, SEAT_MAX = 8;
+let roster = {};                                  // { artworkIndex: { seat, name } }
+let rosterPersisted = true;                       // false → storage unavailable (e.g. private mode)
+
+function kingdomOf(i) { return ARTWORKS[i].name.split(" · ")[0]; }
+function cleanName(t) {
+  // drop control / bidi-override / zero-width chars; collapse spaces; cap length (by code point)
+  const c = String(t).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g, "")
+    .replace(/\s+/g, " ").trim();
+  return Array.from(c).slice(0, NAME_MAX).join("");
+}
+function validEntry(e) {
+  return e && typeof e.seat === "string" && /^[0-9]{1,8}$/.test(e.seat) &&
+    typeof e.name === "string" && e.name.length > 0 && cleanName(e.name) === e.name;
+}
+function artworkKey(tok) {
+  const t = tok.replace(/[：:.．、]$/, "");
+  const m = /^(?:作品|第)?([0-9０-９]{1,2})(?:件|號)?$/.exec(t);
+  if (m) {
+    const n = parseInt(m[1].replace(/[０-９]/g, d => String.fromCharCode(d.charCodeAt(0) - 0xFEE0)), 10);
+    return n >= 1 && n <= ARTWORKS.length ? n - 1 : -1;
+  }
+  for (let i = 0; i < ARTWORKS.length; i++) if (t === kingdomOf(i)) return i;
+  return -1;
+}
+// returns { map, ok, skipped } — a bad line is skipped, never breaks the whole list
+function parseRoster(text) {
+  const map = {}; let ok = 0, skipped = 0;
+  const lines = String(text).slice(0, ROSTER_MAX_CHARS).split(/\r?\n/);
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li].trim();
+    if (!line) continue;
+    if (li >= ROSTER_MAX_LINES || line.length > ROSTER_MAX_LINE) { skipped++; continue; }
+    const toks = line.split(/[\s,，、\t]+/).filter(Boolean);
+    if (toks.length < 3) { skipped++; continue; }
+    const idx = artworkKey(toks[0]);
+    const seat = toks[1].replace(/[０-９]/g, d => String.fromCharCode(d.charCodeAt(0) - 0xFEE0));
+    const name = cleanName(toks.slice(2).join(" "));
+    if (idx < 0 || !/^[0-9]{1,8}$/.test(seat) || !name) { skipped++; continue; }
+    if (!map[idx]) ok++;
+    map[idx] = { seat, name };                    // same artwork twice → the later line wins
+  }
+  return { map, ok, skipped };
+}
+function storageGet() { try { return window.localStorage.getItem(ROSTER_KEY); } catch (e) { return null; } }
+function storageSet(v) { try { window.localStorage.setItem(ROSTER_KEY, v); return true; } catch (e) { return false; } }
+function storageRemove() { try { window.localStorage.removeItem(ROSTER_KEY); return true; } catch (e) { return false; } }
+function loadRoster() {
+  roster = {};
+  const raw = storageGet();
+  if (!raw || raw.length > 8000) return;
+  try {
+    const data = JSON.parse(raw);
+    const items = data && data.v === 1 && data.items;
+    if (!items || typeof items !== "object") return;
+    for (let i = 0; i < ARTWORKS.length; i++) if (validEntry(items[i])) roster[i] = { seat: items[i].seat, name: items[i].name };
+  } catch (e) { roster = {}; }
+}
+function rosterCount() { return Object.keys(roster).length; }
+function rosterToText() {
+  return Object.keys(roster).sort().map(i => "作品" + (Number(i) + 1) + " " + roster[i].seat + " " + roster[i].name).join("\n");
+}
+// The button only says whether a list is saved (✓) — never any name or count.
+function updateRosterBtn() {
+  const n = rosterCount();
+  rosterBtn.textContent = n ? "📋 名單 ✓" : "📋 名單";
+  rosterBtn.classList.toggle("loaded", n > 0);
+  rosterBtn.setAttribute("aria-label", n ? "本機名單（這台電腦已存名單）" : "本機名單（未設定）");
+}
+// The screen is usually projected: reopening shows only "已存 N 筆"; contents appear on 「顯示內容」.
+let revealed = false;
+function setRevealed(on) {
+  revealed = on && rosterCount() > 0;
+  rosterText.value = revealed ? rosterToText() : "";
+  rosterReveal.textContent = revealed ? "隱藏內容" : "顯示內容";
+  rosterReveal.setAttribute("aria-expanded", String(revealed));
+}
+function updateRosterDialog() {
+  const n = rosterCount();
+  rosterSaved.hidden = n === 0;
+  rosterSavedText.textContent = n ? "✓ 這台電腦已存 " + n + " 筆" : "";
+  disarmClear();
+  setDisabled(rosterClearBtn, n === 0);           // nothing to clear → greyed out
+}
+// 「清除名單」 needs two presses: the first arms it (「再按一次確認清除」), it disarms after 4 s
+let clearArmed = false, clearArmTimer = 0;
+function disarmClear() {
+  clearArmed = false; clearTimeout(clearArmTimer);
+  rosterClearBtn.textContent = "清除名單";
+  rosterClearBtn.classList.remove("confirm");
+}
+function openRoster() {
+  if (spinning || !zoomEl.hidden) return;         // locked while a draw is running
+  setRevealed(false);
+  updateRosterDialog();
+  rosterStatus.textContent = rosterPersisted ? "" : "⚠️ 這個瀏覽器不能儲存名單（例如無痕模式），只在這個分頁有效。";
+  rosterEl.hidden = false;
+  rosterText.focus();
+}
+function closeRoster() {
+  if (rosterEl.hidden) return;
+  rosterEl.hidden = true;
+  setRevealed(false);                             // don't leave the list sitting in the DOM
+  disarmClear();
+  rosterStatus.textContent = "";
+  rosterBtn.focus();
+}
+// keep Tab / Shift+Tab inside the dialog while it is open
+rosterEl.addEventListener("keydown", e => {
+  if (e.key !== "Tab") return;
+  const f = Array.from(rosterEl.querySelectorAll("button, textarea"))
+    .filter(el => !el.disabled && el.offsetParent !== null);
+  if (!f.length) return;
+  const first = f[0], last = f[f.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+function saveRoster() {
+  const { map, ok, skipped } = parseRoster(rosterText.value);
+  if (!ok) {
+    rosterStatus.textContent = "沒有可用的行。格式：作品編號 座號 名字，例如「作品1 00000 範例」。";
+    return;
+  }
+  const replaced = rosterCount() > 0;
+  roster = map;
+  rosterPersisted = storageSet(JSON.stringify({ v: 1, items: map }));
+  setRevealed(false);                             // saved → hide the contents again
+  updateRosterDialog();
+  updateRosterBtn();
+  refreshZoomCaption();
+  rosterStatus.textContent = (rosterPersisted ? "✅ 已儲存 " : "⚠️ 這個瀏覽器不能儲存，只在這個分頁有效：") +
+    ok + " 件作品" + (skipped ? "，略過 " + skipped + " 行格式不對的" : "") + (replaced ? "（已取代原本的名單）" : "") + "。";
+}
+function clearRoster() {
+  if (!rosterCount()) return;
+  if (!clearArmed) {                              // first press: arm
+    clearArmed = true;
+    rosterClearBtn.textContent = "再按一次確認清除";
+    rosterClearBtn.classList.add("confirm");
+    clearTimeout(clearArmTimer);
+    clearArmTimer = setTimeout(disarmClear, 4000);
+    return;
+  }
+  roster = {};
+  storageRemove();                                // really delete the stored item, not just the screen
+  setRevealed(false);
+  updateRosterDialog();
+  updateRosterBtn();
+  refreshZoomCaption();                           // back to nicknames at once, even if the zoom is open
+  rosterStatus.textContent = "🗑️ 名單已清除，這台電腦上不再保存。";
+}
+rosterBtn.addEventListener("click", openRoster);
+document.getElementById("rosterSave").addEventListener("click", saveRoster);
+rosterClearBtn.addEventListener("click", clearRoster);
+rosterReveal.addEventListener("click", () => { setRevealed(!revealed); });
+document.getElementById("rosterClose").addEventListener("click", closeRoster);
+rosterEl.addEventListener("click", e => { if (e.target === rosterEl) closeRoster(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeRoster(); });
+window.addEventListener("storage", e => {         // another tab saved / cleared the list
+  if (e.key !== ROSTER_KEY && e.key !== null) return;
+  loadRoster(); updateRosterBtn(); refreshZoomCaption();
+  if (!rosterEl.hidden) { setRevealed(false); updateRosterDialog(); }
+});
+document.getElementById("rosterKeys").textContent =
+  "作品編號：" + ARTWORKS.map((a, i) => (i + 1) + " " + kingdomOf(i)).join("、");
 
 // ── keep the whole card above the sticky buttons (short phones, e.g. 375×667) ──
 // Only scrolls when the card doesn't fit between the top of the screen and the button bar.
@@ -382,10 +568,11 @@ function toIdle() {
   setDisabled(startBtn, !ready);
   startBtn.textContent = ready ? "開始撕牌抽籤 ✦" : "載入作品中…";
   setDisabled(resetBtn, false);
+  setDisabled(rosterBtn, false);
 }
 
 function startDraw() {
-  if (spinning || !ready) return;
+  if (spinning || !ready || !rosterEl.hidden) return;
   spinning = true;
   closeZoom();                                 // 再抽一次：放大畫面自動關閉
   setZoomable(false);
@@ -404,6 +591,7 @@ function startDraw() {
   artName.textContent = "";                    // 輪播期間名字欄一律空白（防暴雷）
   setDisabled(startBtn, true);
   setDisabled(resetBtn, true);                 // 抽籤中禁用重置，避免殘留排程弄亂狀態
+  setDisabled(rosterBtn, true);                // 抽籤中打不開名單
   coverLabel.textContent = "撕牌中…";
   hud.textContent = "奧特曼正在撕牌…";
 
@@ -506,6 +694,7 @@ function finishDraw(winner, winEl) {
     setDisabled(startBtn, false);
     startBtn.textContent = "再抽一次 ✦";
     setDisabled(resetBtn, false);
+    setDisabled(rosterBtn, false);
   }, REVEAL_MS);
 }
 
@@ -544,6 +733,12 @@ function preloadArtworks() {
 }
 
 // 初始狀態
+loadRoster();
+rosterPersisted = (() => {                         // can this browser keep the list? (private mode may refuse)
+  try { const k = ROSTER_KEY + ".probe"; localStorage.setItem(k, "1"); localStorage.removeItem(k); return true; }
+  catch (e) { return false; }
+})();
+updateRosterBtn();
 syncControlsHeight();
 toIdle();
 preloadArtworks();

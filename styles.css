@@ -308,3 +308,58 @@ body {
   .zoomimg { max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); max-width: 78%; }
   .zoomhint { display: none; }
 }
+
+/* ── local class list (📋 名單) ─────────────────────────────────────── */
+.topbar { position: relative; }
+.rosterbtn {
+  position: absolute; top: 10px; right: 12px;
+  font: inherit; font-size: 13px; letter-spacing: 1px;
+  color: #8fa3d6; background: rgba(10, 16, 36, .6);
+  border: 1px solid #2a3a66; border-radius: 16px;
+  padding: 4px 12px; cursor: pointer; opacity: .75;
+}
+.rosterbtn:hover, .rosterbtn:focus-visible { opacity: 1; color: #cfe0ff; }
+.rosterbtn.loaded { color: #ffe08a; border-color: #6b5a22; }
+.rosterbtn:disabled { opacity: .3; cursor: not-allowed; }
+.roster {
+  position: fixed; inset: 0; z-index: 110;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px; background: rgba(3, 4, 12, .9);
+}
+.rosterbox {
+  width: 100%; max-width: 520px; max-height: 100%; overflow: auto;
+  background: #0d1430; border: 1px solid #2a3a66; border-radius: 14px;
+  padding: 18px 18px 16px; box-shadow: 0 16px 50px rgba(0, 0, 0, .7);
+}
+.rostertitle { font-size: 18px; color: #ffe08a; letter-spacing: 2px; margin-bottom: 8px; }
+.rosterhelp { font-size: 13px; color: #aebbe0; line-height: 1.6; margin-bottom: 4px; }
+.rosterhelp b { color: #cfe0ff; }
+.rostertext {
+  display: block; width: 100%; margin: 8px 0 6px; padding: 10px;
+  font: 15px/1.6 ui-monospace, "Noto Sans Mono CJK TC", monospace;
+  color: #fff; background: #060a1c; border: 1px solid #33467a; border-radius: 8px;
+  resize: vertical;
+}
+.rostertext:focus { outline: 2px solid #ffd23b; outline-offset: 1px; }
+.rosternote { font-size: 12px; color: #8796c2; }
+.rosterstatus { min-height: 1.4em; margin: 6px 0; font-size: 13px; color: #ffe08a; }
+.rosterstatus:empty { margin: 0; }
+.rosteractions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.btn.small { padding: 9px 18px; font-size: 14px; letter-spacing: 1px; }
+.rosteractions .btn.ghost { margin-left: 0; }
+.btn.ghost.danger { color: #ffb4a8; border-color: #7a3a33; }
+@media (max-width: 640px) {
+  .rosterbtn { top: 6px; right: 8px; font-size: 12px; padding: 3px 10px; }
+  .topbar { padding-top: 30px; }
+}
+.rostersaved {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px;
+  margin: 8px 0 0; padding: 8px 12px; border-radius: 8px;
+  background: rgba(255, 224, 138, .08); border: 1px solid #4a4220; color: #ffe08a; font-size: 14px;
+}
+.linkbtn {
+  font: inherit; font-size: 13px; color: #9fc0ff; background: none; border: none;
+  text-decoration: underline; cursor: pointer; padding: 2px 0;
+}
+.rosterspacer { flex: 1 1 auto; }
+.btn.ghost.danger.confirm { color: #fff; background: #8a2c22; border-color: #c24a3a; border-style: solid; }

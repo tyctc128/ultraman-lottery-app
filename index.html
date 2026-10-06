@@ -13,6 +13,8 @@
   <header class="topbar">
     <h1>奧特曼揭牌抽籤 <span class="spark">✦</span></h1>
     <p class="subtitle">奧特曼撕下封紙，抽出今天的幸運之星 ✨</p>
+    <!-- local class list (seat number + name): stored only in this browser's localStorage, never uploaded -->
+    <button class="rosterbtn" id="rosterBtn" type="button" aria-haspopup="dialog">📋 名單</button>
   </header>
 
   <main class="wrap">
@@ -59,6 +61,28 @@
     <img class="zoomimg" id="zoomImg" src="data:," alt="">
     <div class="zoomcap" id="zoomCap"></div>
     <div class="zoomhint">點一下或按 Esc 關閉</div>
+  </div>
+
+  <!-- local class list editor: paste only (never via URL), saved only in this browser's localStorage -->
+  <div class="roster" id="roster" hidden role="dialog" aria-modal="true" aria-labelledby="rosterTitle">
+    <div class="rosterbox">
+      <h2 class="rostertitle" id="rosterTitle">本機名單（座號＋名字）</h2>
+      <p class="rosterhelp">每行一件作品：<b>作品編號</b>或<b>王國名稱</b>、座號、名字，用空白隔開。沒填的作品會顯示原本的暱稱。</p>
+      <p class="rosterhelp" id="rosterKeys"></p>
+      <div class="rostersaved" id="rosterSaved" hidden>
+        <span id="rosterSavedText"></span>
+        <button class="linkbtn" id="rosterReveal" type="button" aria-expanded="false">顯示內容</button>
+      </div>
+      <textarea class="rostertext" id="rosterText" rows="5" maxlength="2000" autocomplete="off" spellcheck="false" autocapitalize="off" aria-label="貼上名單" placeholder="作品1 00000 範例&#10;作品2 00000 範例&#10;作品3 00000 範例"></textarea>
+      <p class="rosternote">🔒 名單只存在這台電腦的瀏覽器裡，不會上傳到任何地方。換電腦要重新貼上。</p>
+      <p class="rosterstatus" id="rosterStatus" role="status" aria-live="polite"></p>
+      <div class="rosteractions">
+        <button class="btn ghost small danger" id="rosterClear" type="button">清除名單</button>
+        <span class="rosterspacer"></span>
+        <button class="btn small" id="rosterSave" type="button">儲存名單</button>
+        <button class="btn ghost small" id="rosterClose" type="button">關閉</button>
+      </div>
+    </div>
   </div>
 
   <div class="controls">
